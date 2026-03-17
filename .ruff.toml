@@ -1,0 +1,58 @@
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "*.ipynb",
+]
+
+
+# Same as Black.
+line-length = 88
+output-format = "grouped"
+
+target-version = "py312"
+
+[lint]
+select = [
+  # bugbear rules
+  "B",
+  # remove unused imports
+  "F401",
+  # bare except statements
+  "E722",
+  # unused arguments
+  "ARG",
+  # pyupgrade
+  "UP",
+]
+ignore = [
+  # mutable defaults
+  "B006",
+  "B018",
+  "ARG001",
+  "ARG002",
+]
+
+unfixable = [
+  # disable auto fix for print statements
+  "T201",
+  "T203",
+]
