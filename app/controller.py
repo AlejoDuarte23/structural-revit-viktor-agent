@@ -4,6 +4,7 @@ import logging
 import queue
 import threading
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
@@ -32,6 +33,11 @@ event_loop: asyncio.AbstractEventLoop | None = None
 event_loop_thread: threading.Thread | None = None
 
 set_tracing_disabled(True)
+
+
+@dataclass
+class AgentContext:
+    autodesk_file: Any | None = None
 
 
 def ensure_loop() -> asyncio.AbstractEventLoop:
@@ -89,6 +95,7 @@ def _extract_tool_name(raw: Any) -> str:
 def workflow_agent_sync_stream(
     chat_history: list[dict[str, str]],
     *,
+    autodesk_file: Any | None = None,
     on_done: Callable[[], None] | None = None,
     show_tool_progress: bool = True,
 ) -> Iterator[str]:
@@ -104,7 +111,7 @@ def workflow_agent_sync_stream(
     async def _produce() -> None:
         call_id_to_name: dict[str, str] = {}
         try:
-            agent = Agent(
+            agent = Agent[AgentContext](
                 name="Structural Analysis Assistant",
                 instructions=dedent(
                     """You are a helpful assistant for structural engineering tasks using SAP2000 integration.
@@ -213,6 +220,16 @@ def workflow_agent_sync_stream(
                - generate_table: Create custom tables with data and column headers
                  * Must call show_hide_table with action="show" after to display
 
+               - extract_analytical_model_json: Run ACC automation on the selected Autodesk model
+                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Prints polling updates while the ACC work item runs
+                 * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
+
+               - get_autodesk_file_context: Inspect the selected Autodesk model context for testing
+                 * Returns file metadata such as hub id, project id, item URN, version URN, and ACC output folder id
+                 * Use this when the user wants to verify what Autodesk context the app currently sees
+
                - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
                  * Shows the Autodesk model selected in the Autodesk model field
                  * Use 'show' when the user asks to open or display the model
@@ -272,7 +289,12 @@ def workflow_agent_sync_stream(
             )
 
             # Streamed run (no await here); events are consumed via async iterator.
-            result = Runner.run_streamed(agent, input=chat_history, max_turns=20)  # type: ignore[arg-type]
+            result = Runner.run_streamed(
+                agent,
+                input=chat_history,
+                context=AgentContext(autodesk_file=autodesk_file),
+                max_turns=20,
+            )
 
             async for event in result.stream_events():
                 # Token streaming from raw response delta events
@@ -438,6 +460,7 @@ class Controller(vkt.Controller):
 
         text_stream = workflow_agent_sync_stream(
             chat_history,
+            autodesk_file=params.autodesk_file,
             on_done=self._update_workflow_storage,  # run after stream completes
             show_tool_progress=True,  # emoji tool status lines
         )

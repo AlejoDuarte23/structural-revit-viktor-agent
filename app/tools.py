@@ -5,6 +5,10 @@ from pydantic import BaseModel, Field, Json
 
 from app.viktor_tools.footing_sizing_tool import calculate_footing_sizing_tool
 from app.viktor_tools.footing_concrete_rebar_tool import calculate_footing_concrete_rebar_tool
+from app.viktor_tools.analytical_model_json_tool import (
+    extract_analytical_model_json_tool,
+)
+from app.viktor_tools.autodesk_context_tool import get_autodesk_file_context_tool
 from app.viktor_tools.autodesk_view_tool import show_hide_autodesk_view_tool
 from app.viktor_tools.plotting_tool import generate_plot, show_hide_plot_tool
 from app.viktor_tools.table_tool import generate_table, show_hide_table_tool
@@ -30,6 +34,8 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "calculate_footing_concrete_rebar": "Calculate Footing Concrete Rebar (ACI 318)",
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
+    "extract_analytical_model_json": "Extract Analytical Model JSON",
+    "get_autodesk_file_context": "Get Autodesk File Context",
     "show_hide_autodesk_view": "Show/Hide Autodesk Viewer",
     "show_hide_plot": "Show/Hide Plot",
     "show_hide_table": "Show/Hide Table",
@@ -254,6 +260,8 @@ def get_tools() -> list[Any]:
         display_reaction_loads_table_tool(),
         calculate_footing_sizing_tool(),
         calculate_footing_concrete_rebar_tool(),
+        extract_analytical_model_json_tool(),
+        get_autodesk_file_context_tool(),
         generate_plot(),
         generate_table(),
         show_hide_autodesk_view_tool(),
