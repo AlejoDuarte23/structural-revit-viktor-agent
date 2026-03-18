@@ -5,6 +5,7 @@ import logging
 import os
 import inspect
 import time
+import uuid
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -92,6 +93,12 @@ def _print_poll_event(event: Any) -> None:
     )
 
 
+def _build_unique_output_file_name(file_name: str) -> str:
+    path = Path(file_name)
+    suffix = path.suffix or ".json"
+    return f"{path.stem}_{uuid.uuid4().hex[:5]}{suffix}"
+
+
 async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
     try:
         import viktor as vkt
@@ -112,6 +119,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
         acc_context = get_acc_automation_context(autodesk_file)
         activity_full_alias = require_env("APS_ACTIVITY_FULL_ALIAS")
         activity_signature = require_env("APS_ACTIVITY_SIGNATURE")
+        output_file_name = _build_unique_output_file_name(payload.output_file_name)
 
         input_acc = ActivityInputParameterAcc(
             name="inputModel",
@@ -130,7 +138,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
             description="Analytical model JSON output",
             project_id=acc_context.project_id,
             folder_id=acc_context.output_folder_id,
-            file_name=payload.output_file_name,
+            file_name=output_file_name,
         )
 
         workitem = WorkItemAcc(
@@ -178,7 +186,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
         print(f"ACC lineage URN: {output_item_urn}")
 
         with TemporaryDirectory() as tmpdir:
-            local_output = Path(tmpdir) / payload.output_file_name
+            local_output = Path(tmpdir) / output_file_name
             output_acc.download_to(str(local_output), acc_context.token3lo)
             print(f"Downloaded to: {local_output}")
 
@@ -194,6 +202,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
         return (
             "Successfully generated analytical model JSON from ACC automation. "
             f"Stored JSON in Viktor Storage with key '{payload.storage_key}'. "
+            f"Uploaded ACC file name: {output_file_name}. "
             f"Output ACC item URN: {output_item_urn or 'unknown'}."
         )
 
