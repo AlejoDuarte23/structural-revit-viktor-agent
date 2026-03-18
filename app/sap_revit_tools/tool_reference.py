@@ -220,11 +220,44 @@ class BuildSapFromAnalyticalModelArgs(BaseModel):
 
 
 class Sap2000Session:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        attach_to_instance: bool = True,
+        program_path: str | None = None,
+    ) -> None:
+        self.attach_to_instance = attach_to_instance
+        self.program_path = program_path
         self.helper = None
         self.SapObject = None
         self.SapModel = None
         self._pythoncom = None
+        self._owns_application = False
+
+    def _create_sap_object(self, win32: Any) -> Any:
+        errors: list[str] = []
+
+        if self.program_path and hasattr(self.helper, "CreateObject"):
+            try:
+                return self.helper.CreateObject(self.program_path)
+            except Exception as exc:
+                errors.append(f"CreateObject({self.program_path!r}) failed: {exc}")
+
+        if hasattr(self.helper, "CreateObjectProgID"):
+            try:
+                return self.helper.CreateObjectProgID(SAP_PROGID)
+            except Exception as exc:
+                errors.append(f"CreateObjectProgID({SAP_PROGID!r}) failed: {exc}")
+
+        try:
+            return win32.Dispatch(SAP_PROGID)
+        except Exception as exc:
+            errors.append(f"Dispatch({SAP_PROGID!r}) failed: {exc}")
+
+        raise RuntimeError(
+            "Could not create SAP2000 application instance. "
+            + " | ".join(errors)
+        )
 
     def __enter__(self) -> "Sap2000Session":
         try:
@@ -239,12 +272,22 @@ class Sap2000Session:
         pythoncom.CoInitialize()
         try:
             self.helper = win32.Dispatch("SAP2000v1.Helper")
-            self.SapObject = self.helper.GetObject(SAP_PROGID)
+            if self.attach_to_instance:
+                try:
+                    self.SapObject = self.helper.GetObject(SAP_PROGID)
+                except Exception:
+                    self.SapObject = None
+
             if self.SapObject is None:
-                raise RuntimeError(
-                    "Could not attach. In SAP2000 use: Tools -> Set as active instance for API. "
-                    "Also ensure SAP2000 and Python run with the same admin level and are 64-bit."
-                )
+                self.SapObject = self._create_sap_object(win32)
+                self._owns_application = True
+                if hasattr(self.SapObject, "ApplicationStart"):
+                    start_result = self.SapObject.ApplicationStart()
+                    if start_result not in (None, 0):
+                        raise RuntimeError(
+                            f"SAP2000 ApplicationStart failed (ret={start_result})"
+                        )
+
             self.SapModel = self.SapObject.SapModel
             if self.SapModel is None:
                 raise RuntimeError("Attached SapObject has SapModel=None.")
@@ -255,9 +298,15 @@ class Sap2000Session:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         try:
+            if self._owns_application and self.SapObject is not None and hasattr(self.SapObject, "ApplicationExit"):
+                try:
+                    self.SapObject.ApplicationExit(False)
+                except Exception:
+                    logger.warning("Failed to close SAP2000 application started by worker.", exc_info=True)
             self.SapModel = None
             self.SapObject = None
             self.helper = None
+            self._owns_application = False
         finally:
             if self._pythoncom is not None:
                 self._pythoncom.CoUninitialize()
@@ -1178,6 +1227,67 @@ def store_json_in_viktor(storage_key: str, data: Any) -> None:
     )
 
 
+def build_worker_input_payload(analytical_model: RevitAnalyticalSapImportModel) -> dict[str, Any]:
+    return {
+        "analytical_model": analytical_model.model_dump(mode="json"),
+        "settings": {
+            "attach_to_instance": False,
+            "program_path": None,
+            "material_name": DEFAULT_STEEL_MATERIAL,
+            "concrete_material_name": DEFAULT_CONCRETE_MATERIAL,
+            "default_slab_thickness": DEFAULT_SLAB_THICKNESS_M,
+            "initialize_blank_model": DEFAULT_INITIALIZE_BLANK_MODEL,
+            "units": DEFAULT_SAP_UNITS,
+            "apply_supports": DEFAULT_APPLY_SUPPORTS,
+            "support_policy": DEFAULT_SUPPORT_POLICY,
+            "default_support_restraint": list(DEFAULT_SUPPORT_RESTRAINT),
+            "apply_loads": DEFAULT_APPLY_LOADS,
+            "dead_self_weight_multiplier": DEFAULT_DEAD_SELF_WEIGHT_MULTIPLIER,
+            "run_analysis": DEFAULT_RUN_ANALYSIS,
+            "save_model": True,
+        },
+    }
+
+
+def _get_sap2000_analysis_class() -> Any:
+    import viktor as vkt
+
+    try:
+        return vkt.external.sap2000.SAP2000Analysis
+    except AttributeError:
+        from viktor.external.sap2000 import SAP2000Analysis
+
+        return SAP2000Analysis
+
+
+def run_sap2000_worker_analysis(
+    analytical_model: RevitAnalyticalSapImportModel,
+    *,
+    timeout: int = 300,
+) -> dict[str, Any]:
+    import viktor as vkt
+
+    worker_input = build_worker_input_payload(analytical_model)
+    script_path = Path(__file__).parent / "run_sap2000_model.py"
+    helper_path = Path(__file__)
+    analysis_cls = _get_sap2000_analysis_class()
+
+    analysis = analysis_cls(
+        script=vkt.File.from_path(script_path),
+        files=[
+            ("inputs.json", vkt.File.from_data(json.dumps(worker_input))),
+            (helper_path.name, vkt.File.from_path(helper_path)),
+        ],
+        output_filenames=["output.json"],
+    )
+    analysis.execute(timeout=timeout)
+
+    output_file = analysis.get_output_file("output.json")
+    raw_output = _read_binary_or_text(output_file)
+
+    return json.loads(raw_output)
+
+
 async def build_sap_model_from_analytical_json_func(ctx: Any, args: str) -> str:
     del ctx
 
@@ -1187,74 +1297,31 @@ async def build_sap_model_from_analytical_json_func(ctx: Any, args: str) -> str:
             BuildSapFromAnalyticalModelArgs.model_validate_json(raw_args)
 
         analytical_model, source_note = load_analytical_model_from_source()
-
-        supports_by_node_id, support_note = resolve_supports(
-            analytical_model,
-            support_policy=DEFAULT_SUPPORT_POLICY,
-            default_support_restraint=list(DEFAULT_SUPPORT_RESTRAINT),
-        )
-        area_loads = collect_area_loads(analytical_model)
-
-        with Sap2000Session() as sap:
-            sap_result = import_structural_model_from_payload(
-                sap.SapModel,
-                analytical_model,
-                material_name=DEFAULT_STEEL_MATERIAL,
-                concrete_material_name=DEFAULT_CONCRETE_MATERIAL,
-                default_slab_thickness=DEFAULT_SLAB_THICKNESS_M,
-                initialize_blank_model=DEFAULT_INITIALIZE_BLANK_MODEL,
-                units=DEFAULT_SAP_UNITS,
-            )
-
-            assigned_supports: dict[int, dict[str, Any]] | None = None
-            if DEFAULT_APPLY_SUPPORTS and supports_by_node_id:
-                assigned_supports = assign_supports_by_node_ids(
-                    sap.SapModel,
-                    point_names=sap_result["points"],
-                    restraints_by_node_id=supports_by_node_id,
-                )
-
-            loading_result: dict[str, Any] | None = None
-            if DEFAULT_APPLY_LOADS and area_loads and sap_result["areas"]:
-                loading_result = apply_uniform_area_loads_from_revit_export(
-                    sap.SapModel,
-                    area_name_by_area_id=sap_result["areas"],
-                    load_payloads=area_loads,
-                    default_self_weight_multiplier=DEFAULT_DEAD_SELF_WEIGHT_MULTIPLIER,
-                )
-                loading_result["combos"] = create_default_design_combos(
-                    sap.SapModel,
-                    available_case_names=loading_result["cases"],
-                )
-
-            save_path = save_model(
-                sap.SapModel,
-                DEFAULT_SAVE_MODEL_PATH or _build_temp_model_path(),
-            )
-
-            if DEFAULT_RUN_ANALYSIS:
-                run_analysis(sap.SapModel)
-
-            supports, reactions = get_support_reactions_all_results(sap.SapModel)
+        worker_output = run_sap2000_worker_analysis(analytical_model, timeout=300)
+        supports = worker_output["supports"]
+        reactions = worker_output["reactions"]
+        metadata = worker_output.get("metadata", {})
 
         store_json_in_viktor(SUPPORT_COORDINATES_STORAGE_KEY, supports)
         store_json_in_viktor(REACTION_LOADS_STORAGE_KEY, reactions)
 
-        num_results_per_node = len(next(iter(reactions.values()))) if reactions else 0
-        loading_summary = (
-            f"{len(loading_result['assigned_loads'])} assigned area loads "
-            f"and {len(loading_result.get('combos', []))} hard-coded combos"
-            if loading_result is not None
-            else "no area loads assigned"
+        num_results_per_node = int(
+            metadata.get(
+                "result_count_per_node",
+                len(next(iter(reactions.values()))) if reactions else 0,
+            )
         )
-        save_note = (
-            f" Model saved to {save_path}."
-        )
+        loading_summary = str(metadata.get("loading_summary", "no area loads assigned"))
+        save_path = metadata.get("save_path")
+        save_note = f" Model saved to {save_path}." if save_path else ""
+        support_note = str(metadata.get("support_note", "Supports resolved in worker."))
+        points_created = int(metadata.get("points_created", 0))
+        frames_created = int(metadata.get("frames_created", 0))
+        areas_created = int(metadata.get("areas_created", 0))
 
         return (
             f"Imported analytical model into SAP2000. {source_note}. {support_note} "
-            f"Created {len(sap_result['points'])} points, {len(sap_result['frames'])} frames, "
-            f"and {len(sap_result['areas'])} areas. "
+            f"Created {points_created} points, {frames_created} frames, and {areas_created} areas. "
             f"Detected {len(supports)} support nodes and stored them in '{SUPPORT_COORDINATES_STORAGE_KEY}'. "
             f"Stored reactions for {len(reactions)} nodes in '{REACTION_LOADS_STORAGE_KEY}' "
             f"with {num_results_per_node} load cases/combos per node. "

@@ -4,3 +4,6 @@ registered_name = "webinar-autodesk-revit-structural-agent"
 oauth2_integrations = [
     "aps-automation-webinar-alejandro"
 ]
+worker_integrations = [
+    "sap2000",
+]
