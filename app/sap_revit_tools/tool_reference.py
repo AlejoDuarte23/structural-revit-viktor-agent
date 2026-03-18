@@ -38,6 +38,8 @@ DEFAULT_APPLY_LOADS = True
 DEFAULT_RUN_ANALYSIS = True
 DEFAULT_INITIALIZE_BLANK_MODEL = True
 DEFAULT_DEAD_SELF_WEIGHT_MULTIPLIER = 0.0
+DEFAULT_MANUAL_DL_UNIFORM_KN_PER_M2 = -2.0
+DEFAULT_MANUAL_LL_UNIFORM_KN_PER_M2 = -4.0
 DEFAULT_DEAD_CASE_NAME = "DL"
 DEFAULT_LIVE_CASE_NAME = "LL"
 DEFAULT_DESIGN_COMBOS: list[tuple[str, dict[str, float]]] = [
@@ -1251,6 +1253,8 @@ def build_worker_input_payload(analytical_model: RevitAnalyticalSapImportModel) 
             "default_support_restraint": list(DEFAULT_SUPPORT_RESTRAINT),
             "apply_loads": DEFAULT_APPLY_LOADS,
             "dead_self_weight_multiplier": DEFAULT_DEAD_SELF_WEIGHT_MULTIPLIER,
+            "manual_dl_uniform_kn_per_m2": DEFAULT_MANUAL_DL_UNIFORM_KN_PER_M2,
+            "manual_ll_uniform_kn_per_m2": DEFAULT_MANUAL_LL_UNIFORM_KN_PER_M2,
             "run_analysis": DEFAULT_RUN_ANALYSIS,
             "save_model": True,
         },
