@@ -1012,7 +1012,7 @@ def create_default_design_combos(
 
 def get_point_coords(SapModel: Any, point_name: str) -> tuple[float, float, float]:
     result = SapModel.PointObj.GetCoordCartesian(point_name, 0, 0, 0)
-    if not isinstance(result, tuple) or len(result) != 4:
+    if not isinstance(result, (list, tuple)) or len(result) != 4:
         raise RuntimeError(f"GetCoordCartesian returned unexpected format: {result}")
 
     z_sap, x_sap, y_sap, ret = result
@@ -1028,8 +1028,8 @@ def get_point_restraint(SapModel: Any, point_name: str) -> list[int]:
     except Exception:
         result = SapModel.PointObj.GetRestraint(point_name)
 
-    if not isinstance(result, tuple):
-        raise RuntimeError(f"GetRestraint returned non-tuple: {type(result)} {result}")
+    if not isinstance(result, (list, tuple)):
+        raise RuntimeError(f"GetRestraint returned unsupported result: {type(result)} {result}")
 
     restraint = None
     ret = None
@@ -1103,7 +1103,7 @@ def select_results_output(SapModel: Any, name: str) -> str:
 def get_joint_reaction_first_row(SapModel: Any, joint_name: str) -> dict[str, Any]:
     result = SapModel.Results.JointReact(joint_name, 0)
 
-    if not isinstance(result, tuple) or len(result) < 13:
+    if not isinstance(result, (list, tuple)) or len(result) < 13:
         raise RuntimeError(f"JointReact returned unexpected result for joint {joint_name}: {result}")
 
     (
