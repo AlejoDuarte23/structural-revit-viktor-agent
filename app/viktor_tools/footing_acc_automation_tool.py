@@ -18,8 +18,8 @@ INPUT_MODEL_PARAMETER_NAME = "inputModel"
 INPUT_MODEL_LOCAL_NAME = "input.rvt"
 FOOTINGS_JSON_PARAMETER_NAME = "footings"
 FOOTINGS_JSON_LOCAL_NAME = "footings.json"
-OUTPUT_MODEL_PARAMETER_NAME = "outputModel"
-OUTPUT_MODEL_LOCAL_NAME = "output.rvt"
+OUTPUT_MODEL_PARAMETER_NAME = "resultModel"
+OUTPUT_MODEL_LOCAL_NAME = "result.rvt"
 DEFAULT_OUTPUT_FILE_NAME = "footing_output.rvt"
 DEFAULT_MAX_WAIT = 1200
 DEFAULT_INTERVAL = 10
@@ -166,16 +166,26 @@ async def run_footing_acc_automation_func(ctx: Any, args: str) -> str:
             project_id=acc_context.project_id,
             linage_urn=acc_context.input_item_urn,
         )
-        footings_json = ActivityJsonParameter(
-            name=FOOTINGS_JSON_PARAMETER_NAME,
-            localName=FOOTINGS_JSON_LOCAL_NAME,
+
+        from tempfile import NamedTemporaryFile
+        import json
+        from aps_automation_sdk.classes  import UploadActivityInputParameter
+         
+        with NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as tmp:
+            json.dump(footing_payload, tmp, separators=(",", ":"))
+            footing_payload_path = tmp.name
+         
+        footings_json = UploadActivityInputParameter(
+            name="footingPayload",
+            folder_id= acc_context.output_folder_id,
+            project_id= acc_context.project_id,
+            localName="pad_foundations.json",
+            file_name="pad_foundations.json",
+            file_path= footing_payload_path,
             verb="get",
-            description="Footing dimensions and coordinates payload",
+            description="Pad foundations JSON payload",
             required=True,
-            content={},
         )
-        # The SDK currently types JSON content as a dict, but the add-in expects a bare list.
-        footings_json.content = footing_payload
         output_acc = ActivityOutputParameterAcc(
             name=OUTPUT_MODEL_PARAMETER_NAME,
             localName=OUTPUT_MODEL_LOCAL_NAME,
