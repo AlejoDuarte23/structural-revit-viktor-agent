@@ -114,7 +114,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
         activity_signature = require_env("APS_ACTIVITY_SIGNATURE")
 
         input_acc = ActivityInputParameterAcc(
-            name="InputModel",
+            name="inputModel",
             localName="input.rvt",
             verb="get",
             description="Input Revit model from ACC",
@@ -124,8 +124,8 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
             linage_urn=acc_context.input_item_urn,
         )
         output_acc = ActivityOutputParameterAcc(
-            name="ResultJson",
-            localName=payload.output_file_name,
+            name="exportJson",
+            localName="analytical_export.json",
             verb="put",
             description="Analytical model JSON output",
             project_id=acc_context.project_id,

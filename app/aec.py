@@ -5,7 +5,7 @@ from typing import Any
 
 
 APS_VIEWER_OAUTH_INTEGRATION = "aps-automation-webinar-alejandro"
-APS_AUTOMATION_OAUTH_INTEGRATION = "aps-integration-automation-v2"
+APS_AUTOMATION_OAUTH_INTEGRATION = "aps-automation-webinar-alejandro"
 
 
 @dataclass(frozen=True)
