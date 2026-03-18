@@ -134,6 +134,13 @@ def workflow_agent_sync_stream(
                  * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
                  * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
 
+               - run_footing_acc_automation: Run the ACC footing automation on the selected Autodesk model
+                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Prints polling updates while the ACC work item runs
+                 * Creates the generated output file directly in ACC in the same folder as the selected model
+                 * Does not download the result locally or store it in Viktor Storage
+                 * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
+
                - build_sap_model_from_analytical_json: Run the SAP2000 worker flow
                  * Reads the analytical JSON from Viktor Storage
                  * Builds the SAP2000 model, assigns supports, assigns slab loads, runs analysis, and stores results

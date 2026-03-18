@@ -8,6 +8,9 @@ from app.viktor_tools.footing_concrete_rebar_tool import calculate_footing_concr
 from app.viktor_tools.analytical_model_json_tool import (
     extract_analytical_model_json_tool,
 )
+from app.viktor_tools.footing_acc_automation_tool import (
+    run_footing_acc_automation_tool,
+)
 from app.viktor_tools.autodesk_context_tool import get_autodesk_file_context_tool
 from app.viktor_tools.autodesk_view_tool import show_hide_autodesk_view_tool
 from app.viktor_tools.plotting_tool import generate_plot, show_hide_plot_tool
@@ -34,6 +37,7 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
     "extract_analytical_model_json": "Extract Analytical Model JSON",
+    "run_footing_acc_automation": "Run Footing ACC Automation",
     "get_autodesk_file_context": "Get Autodesk File Context",
     "show_hide_autodesk_view": "Show/Hide Autodesk Viewer",
     "show_hide_plot": "Show/Hide Plot",
@@ -254,6 +258,7 @@ def get_tools() -> list[Any]:
         calculate_footing_sizing_tool(),
         calculate_footing_concrete_rebar_tool(),
         extract_analytical_model_json_tool(),
+        run_footing_acc_automation_tool(),
         get_autodesk_file_context_tool(),
         generate_plot(),
         generate_table(),
