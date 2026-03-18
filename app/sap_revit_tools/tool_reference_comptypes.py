@@ -1106,22 +1106,40 @@ def get_joint_reaction_first_row(SapModel: Any, joint_name: str) -> dict[str, An
     if not isinstance(result, (list, tuple)) or len(result) < 13:
         raise RuntimeError(f"JointReact returned unexpected result for joint {joint_name}: {result}")
 
-    (
-        ret_code,
-        _number_results,
-        _obj,
-        _elm,
-        load_case_arr,
-        step_type,
-        step_num,
-        f1,
-        f2,
-        f3,
-        m1,
-        m2,
-        m3,
-        *_rest,
-    ) = result
+    if len(result) >= 13 and isinstance(result[1], int):
+        (
+            ret_code,
+            _number_results,
+            _obj,
+            _elm,
+            load_case_arr,
+            step_type,
+            step_num,
+            f1,
+            f2,
+            f3,
+            m1,
+            m2,
+            m3,
+            *_rest,
+        ) = result
+    else:
+        (
+            _number_results,
+            _obj,
+            _elm,
+            load_case_arr,
+            step_type,
+            step_num,
+            f1,
+            f2,
+            f3,
+            m1,
+            m2,
+            m3,
+            ret_code,
+            *_rest,
+        ) = result
 
     if ret_code != 0:
         raise RuntimeError(f"JointReact({joint_name}) failed (ret={ret_code})")
