@@ -335,8 +335,8 @@ class Sap2000Session:
 
 
 def _parse_getnamelist_result(result: Any) -> tuple[list[str], int]:
-    if not isinstance(result, tuple):
-        raise RuntimeError(f"GetNameList returned non-tuple: {type(result)} {result}")
+    if not isinstance(result, (list, tuple)):
+        raise RuntimeError(f"GetNameList returned unsupported result: {type(result)} {result}")
 
     ints = [value for value in result if isinstance(value, int)]
     lists = [value for value in result if isinstance(value, (list, tuple))]
@@ -346,6 +346,23 @@ def _parse_getnamelist_result(result: Any) -> tuple[list[str], int]:
     ret = 0 if 0 in ints else int(ints[-1])
     names = max(lists, key=len)
     return [str(name) for name in names], ret
+
+
+def _parse_named_object_result(result: Any, api_name: str) -> tuple[int, str]:
+    if not isinstance(result, (list, tuple)):
+        raise RuntimeError(f"{api_name} returned unsupported result: {type(result)} {result}")
+
+    ret: int | None = None
+    object_name = ""
+    for value in result:
+        if isinstance(value, int):
+            ret = int(value)
+        elif isinstance(value, str) and not object_name:
+            object_name = value
+
+    if ret is None:
+        raise RuntimeError(f"Could not parse {api_name} return: {result}")
+    return ret, object_name
 
 
 def _read_name_list(getter: Any, *args: Any) -> list[str]:
@@ -553,10 +570,7 @@ def create_points_from_payload(
     for node in payload.nodes:
         point_name = str(node.node_id)
         result = SapModel.PointObj.AddCartesian(node.x, node.y, node.z, " ", point_name)
-        if not isinstance(result, tuple) or len(result) < 2:
-            raise RuntimeError(f"PointObj.AddCartesian returned unexpected result for node {point_name}: {result}")
-
-        ret, sap_name = result[0], result[1]
+        ret, sap_name = _parse_named_object_result(result, "PointObj.AddCartesian")
         if ret != 0:
             raise RuntimeError(f"PointObj.AddCartesian failed for node {point_name} (ret={ret})")
 
@@ -590,10 +604,7 @@ def create_frames_from_payload(
             imported_sections[section_label],
             "Global",
         )
-        if not isinstance(result, tuple) or len(result) < 2:
-            raise RuntimeError(f"FrameObj.AddByPoint returned unexpected result for frame {frame_name}: {result}")
-
-        ret, sap_name = result[0], result[1]
+        ret, sap_name = _parse_named_object_result(result, "FrameObj.AddByPoint")
         if ret != 0:
             raise RuntimeError(f"FrameObj.AddByPoint failed for frame {frame_name} (ret={ret})")
 
@@ -603,20 +614,7 @@ def create_frames_from_payload(
 
 
 def _parse_add_area_result(result: Any) -> tuple[int, str]:
-    if not isinstance(result, tuple):
-        raise RuntimeError(f"AreaObj.AddByPoint returned non-tuple: {type(result)} {result}")
-
-    ret = None
-    area_name = ""
-    for value in result:
-        if isinstance(value, int):
-            ret = value
-        elif isinstance(value, str):
-            area_name = value
-
-    if ret is None:
-        raise RuntimeError(f"Could not parse AreaObj.AddByPoint return: {result}")
-    return int(ret), str(area_name)
+    return _parse_named_object_result(result, "AreaObj.AddByPoint")
 
 
 def _infer_area_thickness(area: ExportAreaModel, default_thickness: float) -> float:
