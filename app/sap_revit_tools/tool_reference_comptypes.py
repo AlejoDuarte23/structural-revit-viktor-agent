@@ -365,6 +365,18 @@ def _parse_named_object_result(result: Any, api_name: str) -> tuple[int, str]:
     return ret, object_name
 
 
+def _extract_ret_code(result: Any, api_name: str) -> int:
+    if isinstance(result, int):
+        return int(result)
+
+    if isinstance(result, (list, tuple)):
+        for value in reversed(result):
+            if isinstance(value, int):
+                return int(value)
+
+    raise RuntimeError(f"Could not parse {api_name} return code: {result}")
+
+
 def _read_name_list(getter: Any, *args: Any) -> list[str]:
     try:
         names, ret = _parse_getnamelist_result(getter(*args))
@@ -397,7 +409,7 @@ def get_all_frame_section_names(SapModel: Any) -> list[str]:
 
 
 def run_analysis(SapModel: Any) -> None:
-    ret = SapModel.Analyze.RunAnalysis()
+    ret = _extract_ret_code(SapModel.Analyze.RunAnalysis(), "Analyze.RunAnalysis")
     if ret != 0:
         raise RuntimeError(f"Analyze.RunAnalysis failed (ret={ret})")
 
@@ -411,7 +423,7 @@ def _build_temp_model_path() -> Path:
 def save_model(SapModel: Any, target_path: str | Path) -> Path:
     save_path = Path(target_path).resolve()
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    ret = SapModel.File.Save(str(save_path))
+    ret = _extract_ret_code(SapModel.File.Save(str(save_path)), "SapModel.File.Save")
     if ret != 0:
         raise RuntimeError(f"SapModel.File.Save failed for {save_path} (ret={ret})")
     return save_path
@@ -734,7 +746,7 @@ def assign_supports_by_node_ids(
 
         point_name = point_names[node_id]
         result = SapModel.PointObj.SetRestraint(point_name, [int(value) for value in restraint_values])
-        ret = result[0] if isinstance(result, tuple) else result
+        ret = _extract_ret_code(result, "PointObj.SetRestraint")
         if ret != 0:
             raise RuntimeError(f"PointObj.SetRestraint failed for point {point_name} (ret={ret})")
 
@@ -777,7 +789,7 @@ def ensure_load_pattern(
         float(self_weight_multiplier),
         bool(add_analysis_case),
     )
-    ret = result[0] if isinstance(result, tuple) else result
+    ret = _extract_ret_code(result, "LoadPatterns.Add")
     if ret != 0:
         raise RuntimeError(f"LoadPatterns.Add failed for {name} (ret={ret})")
     return name
@@ -790,7 +802,7 @@ def recreate_static_linear_case_from_pattern(
     scale_factor: float = 1.0,
 ) -> str:
     result = SapModel.LoadCases.StaticLinear.SetCase(case_name)
-    ret = result[0] if isinstance(result, tuple) else result
+    ret = _extract_ret_code(result, "LoadCases.StaticLinear.SetCase")
     if ret != 0:
         raise RuntimeError(f"LoadCases.StaticLinear.SetCase failed for {case_name} (ret={ret})")
 
@@ -801,7 +813,7 @@ def recreate_static_linear_case_from_pattern(
         [pattern_name],
         [float(scale_factor)],
     )
-    ret = result[0] if isinstance(result, tuple) else result
+    ret = _extract_ret_code(result, "LoadCases.StaticLinear.SetLoads")
     if ret != 0:
         raise RuntimeError(f"LoadCases.StaticLinear.SetLoads failed for {case_name} (ret={ret})")
     return case_name
@@ -821,12 +833,12 @@ def recreate_linear_additive_combo(
     existing_combo_names = set(get_all_load_combos(SapModel))
     if combo_name in existing_combo_names:
         result = SapModel.RespCombo.Delete(combo_name)
-        ret = result[0] if isinstance(result, tuple) else result
+        ret = _extract_ret_code(result, "RespCombo.Delete")
         if ret != 0:
             raise RuntimeError(f"RespCombo.Delete failed for {combo_name} (ret={ret})")
 
     result = SapModel.RespCombo.Add(combo_name, CSI_COMBO_LINEAR_ADDITIVE)
-    ret = result[0] if isinstance(result, tuple) else result
+    ret = _extract_ret_code(result, "RespCombo.Add")
     if ret != 0:
         raise RuntimeError(f"RespCombo.Add failed for {combo_name} (ret={ret})")
 
@@ -837,7 +849,7 @@ def recreate_linear_additive_combo(
             case_name,
             float(scale_factor),
         )
-        ret = result[0] if isinstance(result, tuple) else result
+        ret = _extract_ret_code(result, "RespCombo.SetCaseList")
         if ret != 0:
             raise RuntimeError(
                 f"RespCombo.SetCaseList failed for combo {combo_name}, case {case_name} (ret={ret})"
@@ -889,7 +901,7 @@ def assign_uniform_area_load(
         coordinate_system,
         CSI_ITEMTYPE_OBJECTS,
     )
-    ret = result[0] if isinstance(result, tuple) else result
+    ret = _extract_ret_code(result, "AreaObj.SetLoadUniform")
     if ret != 0:
         raise RuntimeError(
             f"AreaObj.SetLoadUniform failed for area {area_name}, pattern {load_pattern_name} (ret={ret})"
@@ -1064,15 +1076,24 @@ def get_support_nodes(SapModel: Any) -> list[dict[str, Any]]:
 
 
 def select_results_output(SapModel: Any, name: str) -> str:
-    ret = SapModel.Results.Setup.DeselectAllCasesAndCombosForOutput()
+    ret = _extract_ret_code(
+        SapModel.Results.Setup.DeselectAllCasesAndCombosForOutput(),
+        "Results.Setup.DeselectAllCasesAndCombosForOutput",
+    )
     if ret != 0:
         raise RuntimeError(f"DeselectAllCasesAndCombosForOutput failed (ret={ret})")
 
-    ret_case = SapModel.Results.Setup.SetCaseSelectedForOutput(name)
+    ret_case = _extract_ret_code(
+        SapModel.Results.Setup.SetCaseSelectedForOutput(name),
+        "Results.Setup.SetCaseSelectedForOutput",
+    )
     if ret_case == 0:
         return "case"
 
-    ret_combo = SapModel.Results.Setup.SetComboSelectedForOutput(name)
+    ret_combo = _extract_ret_code(
+        SapModel.Results.Setup.SetComboSelectedForOutput(name),
+        "Results.Setup.SetComboSelectedForOutput",
+    )
     if ret_combo == 0:
         return "combo"
 
