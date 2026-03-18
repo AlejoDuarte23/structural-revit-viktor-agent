@@ -4,6 +4,7 @@ import logging
 import queue
 import threading
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
@@ -14,6 +15,7 @@ from agents import Agent, Runner
 from openai.types.responses import ResponseTextDeltaEvent
 from agents import set_tracing_disabled
 
+from app.aec import get_model_context
 from app.tools import get_tools, TOOL_DISPLAY_NAMES
 from app.viktor_tools.plotting_tool import PlotTool
 from app.viktor_tools.table_tool import TableTool
@@ -31,6 +33,11 @@ event_loop: asyncio.AbstractEventLoop | None = None
 event_loop_thread: threading.Thread | None = None
 
 set_tracing_disabled(True)
+
+
+@dataclass
+class AgentContext:
+    autodesk_file: Any | None = None
 
 
 def ensure_loop() -> asyncio.AbstractEventLoop:
@@ -88,6 +95,7 @@ def _extract_tool_name(raw: Any) -> str:
 def workflow_agent_sync_stream(
     chat_history: list[dict[str, str]],
     *,
+    autodesk_file: Any | None = None,
     on_done: Callable[[], None] | None = None,
     show_tool_progress: bool = True,
 ) -> Iterator[str]:
@@ -103,7 +111,7 @@ def workflow_agent_sync_stream(
     async def _produce() -> None:
         call_id_to_name: dict[str, str] = {}
         try:
-            agent = Agent(
+            agent = Agent[AgentContext](
                 name="Structural Analysis Assistant",
                 instructions=dedent(
                     """You are a helpful assistant for structural engineering tasks using SAP2000 integration.
@@ -212,6 +220,21 @@ def workflow_agent_sync_stream(
                - generate_table: Create custom tables with data and column headers
                  * Must call show_hide_table with action="show" after to display
 
+               - extract_analytical_model_json: Run ACC automation on the selected Autodesk model
+                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Prints polling updates while the ACC work item runs
+                 * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
+
+               - get_autodesk_file_context: Inspect the selected Autodesk model context for testing
+                 * Returns file metadata such as hub id, project id, item URN, version URN, and ACC output folder id
+                 * Use this when the user wants to verify what Autodesk context the app currently sees
+
+               - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
+                 * Shows the Autodesk model selected in the Autodesk model field
+                 * Use 'show' when the user asks to open or display the model
+                 * Use 'hide' when the user asks to close or hide the model viewer
+
                - generate_footings_plot: Create plan view visualization of footing designs
                  * AUTOMATIC WORKFLOW (Recommended):
                    → Just call with {} (empty parameters) - no manual data entry needed!
@@ -230,6 +253,7 @@ def workflow_agent_sync_stream(
 
                - show_hide_plot: Control Plot view panel visibility
                - show_hide_table: Control Table view panel visibility
+               - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
                - show_hide_footings_plot: Control Footings Plot view panel visibility
 
             6. WORKFLOW GRAPHS (Optional)
@@ -265,7 +289,12 @@ def workflow_agent_sync_stream(
             )
 
             # Streamed run (no await here); events are consumed via async iterator.
-            result = Runner.run_streamed(agent, input=chat_history, max_turns=20)  # type: ignore[arg-type]
+            result = Runner.run_streamed(
+                agent,
+                input=chat_history,
+                context=AgentContext(autodesk_file=autodesk_file),
+                max_turns=20,
+            )
 
             async for event in result.stream_events():
                 # Token streaming from raw response delta events
@@ -379,6 +408,24 @@ def get_footings_plot_visibility(params, **kwargs):
         return False
 
 
+def get_autodesk_view_visibility(params, **kwargs):
+    if not params.chat:
+        entities = vkt.Storage().list(scope="entity")
+        for entity in entities:
+            if entity == "show_autodesk_view":
+                vkt.Storage().delete("show_autodesk_view", scope="entity")
+
+    try:
+        out_bool = vkt.Storage().get("show_autodesk_view", scope="entity").getvalue()
+        print(f"autodesk_view {out_bool=}")
+        if out_bool == "show":
+            return True
+        return False
+    except Exception:
+        # If there is no data, then view is hidden.
+        return False
+
+
 class Parametrization(vkt.Parametrization):
     title = vkt.Text("""# VIKTOR Structural Analysis Agent
 
@@ -387,11 +434,16 @@ Extract and analyze data from SAP2000 models! 🏗️
 **What I can do:**
 - 📊 Extract support coordinates and reaction loads from SAP2000 via COM
 - 📋 Display extracted data in interactive tables
+- 🏢 View Autodesk models in an embedded viewer
 - 🔧 Design concrete footings according to ACI 318/NSR-10
 - 📈 Visualize data with plots and charts
 - 🔗 Create workflow graphs to document processes
 
 """)
+    autodesk_file = vkt.AutodeskFileField(
+        "Autodesk model",
+        oauth2_integration="aps-automation-webinar-alejandro",
+    )
     chat = vkt.Chat("", method="call_llm")
 
 
@@ -408,6 +460,7 @@ class Controller(vkt.Controller):
 
         text_stream = workflow_agent_sync_stream(
             chat_history,
+            autodesk_file=params.autodesk_file,
             on_done=self._update_workflow_storage,  # run after stream completes
             show_tool_progress=True,  # emoji tool status lines
         )
@@ -466,6 +519,35 @@ class Controller(vkt.Controller):
         # Default placeholder when no workflow exists
         placeholder_html = "<!DOCTYPE html><html><head><style>body { margin: 0; background-color: white; }</style></head><body></body></html>"
         return vkt.WebResult(html=placeholder_html)
+
+    @vkt.WebView(
+        "Viewer",
+        width=100,
+        duration_guess=30,
+        visible=get_autodesk_view_visibility,
+    )
+    def show_cad_model(self, params, **kwargs) -> vkt.WebResult:
+        if not params.autodesk_file:
+            placeholder_html = (
+                "<!DOCTYPE html><html><head><style>"
+                "body { margin: 0; font-family: sans-serif; display: grid; place-items: center; "
+                "min-height: 100vh; color: #475569; background: #f8fafc; }"
+                ".message { padding: 24px; text-align: center; }"
+                "</style></head><body><div class='message'>"
+                "Select an Autodesk model to open the viewer."
+                "</div></body></html>"
+            )
+            return vkt.WebResult(html=placeholder_html)
+
+        from aps_viewer_sdk import APSViewer
+
+        context = get_model_context(params.autodesk_file)
+        viewer = APSViewer(
+            urn=context.version_urn,
+            token=context.token,
+            views_selector=True,
+        )
+        return vkt.WebResult(html=viewer.write())
 
     @vkt.PlotlyView("Plot Tool", width=100, visible=get_visibility)
     def plot_view(self, params, **kwargs) -> vkt.PlotlyResult:
