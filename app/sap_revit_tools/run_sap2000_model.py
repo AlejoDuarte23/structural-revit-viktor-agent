@@ -145,7 +145,7 @@ def main() -> None:
                 area_name_by_area_id=sap_result["areas"],
                 dl_kn_per_m2=float(settings.get("manual_dl_uniform_kn_per_m2", -2.0)),
                 ll_kn_per_m2=float(settings.get("manual_ll_uniform_kn_per_m2", -4.0)),
-                default_self_weight_multiplier=float(settings.get("dead_self_weight_multiplier", 0.0)),
+                dead_self_weight_multiplier=float(settings.get("dead_self_weight_multiplier", 0.0)),
             )
             loading_result["combos"] = create_default_design_combos(
                 sap.SapModel,
