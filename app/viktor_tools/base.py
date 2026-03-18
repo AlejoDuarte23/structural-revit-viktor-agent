@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 VIKTOR_TOKEN = (os.getenv("TOKEN_VK_APP") or "").strip() or None
 MAX_POLL_SECONDS = int(os.getenv("VIKTOR_MAX_POLL_SECONDS", "120"))
 
-API_BASE = os.getenv("VIKTOR_API_BASE", "https://beta.viktor.ai/api").rstrip("/")
+API_BASE = os.getenv("VIKTOR_API_BASE", "https://demo.viktor.ai/api").rstrip("/")
 
 HTTP_CONNECT_TIMEOUT = float(os.getenv("VIKTOR_HTTP_CONNECT_TIMEOUT", "5"))
 HTTP_READ_TIMEOUT = float(os.getenv("VIKTOR_HTTP_READ_TIMEOUT", "120"))

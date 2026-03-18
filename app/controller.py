@@ -134,6 +134,15 @@ def workflow_agent_sync_stream(
                  * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
                  * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
 
+               - run_footing_acc_automation: Run the ACC footing automation on the selected Autodesk model
+                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Reads footing data from Viktor Storage key 'footing_sizing_results'
+                 * Sends only footing B, L, x, y, z values to the add-in payload
+                 * Prints polling updates while the ACC work item runs
+                 * Creates the generated output file directly in ACC in the same folder as the selected model
+                 * Does not download the result locally or store it in Viktor Storage
+                 * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
+
                - build_sap_model_from_analytical_json: Run the SAP2000 worker flow
                  * Reads the analytical JSON from Viktor Storage
                  * Builds the SAP2000 model, assigns supports, assigns slab loads, runs analysis, and stores results
@@ -168,17 +177,17 @@ def workflow_agent_sync_stream(
                → Call display_support_coordinates_table
 
             3. FOOTING DESIGN (Integrated with SAP2000)
-               - calculate_footing_sizing: Optimize footing geometry to minimize weight
-                 * URL: https://beta.viktor.ai/workspaces/4865/app/editor/2639
+               - calculate_footing_sizing: Run foundation pad sizing
+                 * URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
                  * Automatically loads node coordinates and reaction loads from SAP2000 storage
                  * REQUIRES: build_sap_model_from_analytical_json must be run first
-                 * Uses iterative optimization to find lightest footing satisfying bearing capacity
-                 * Handles eccentric loading (single and biaxial eccentricity cases)
-                 * User provides: material properties (gamma_concrete, gamma_fill), bearing capacity table, min footing length
+                 * Sends soil.q_allow, soil.gamma_c, soil.depth, and soil.b_min to the app
+                 * Sends nodes_section.nodes_table and lc_section.load_cases_table built from SAP2000 storage
+                 * Stores the exported governing pad sizing list in 'footing_sizing_results'
 
                  LOAD COMBINATION SELECTION:
                  * Use 'load_combinations_to_check' to specify which combos to use (e.g., ['ULS2', 'ULS3'])
-                   Tool optimizes footings to satisfy ALL specified combinations per node
+                   Tool includes all specified combinations per node
                  * Can pass single combo name as string (e.g., 'ULS3')
                  * If None, uses all available combos for optimization
 
@@ -249,8 +258,8 @@ def workflow_agent_sync_stream(
                - sap2000_tool: SAP2000 connection check (no URL - connection verification)
                - sap2000_load_combos: Get available load combinations (no URL - SAP2000 query)
                - sap2000_extraction: SAP2000 data extraction step (no URL - represents extraction process)
-               - footing_sizing: Footing sizing optimization (minimize weight)
-                 → URL: https://beta.viktor.ai/workspaces/4865/app/editor/2639
+               - footing_sizing: Foundation pad sizing
+                 → URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
                  → Typically depends on: sap2000_load_combos, sap2000_extraction
                - footing_concrete_rebar: Concrete rebar design per ACI 318-19
                  → URL: https://beta.viktor.ai/workspaces/4864/app/editor/2640
