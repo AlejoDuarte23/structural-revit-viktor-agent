@@ -1399,7 +1399,7 @@ def build_sap_model_from_analytical_json_comptypes_tool() -> Any:
     from agents import FunctionTool
 
     return FunctionTool(
-        name="build_sap_model_from_analytical_json_comptypes",
+        name="build_sap_model_from_analytical_json",
         description=(
             "Single-file SAP2000 import tool using comtypes. Reads the analytical model JSON from Viktor Storage "
             "(key: 'acc_analytical_model_json'), parses and validates it, "
