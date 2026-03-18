@@ -42,6 +42,7 @@ def main() -> None:
 
     with Sap2000Session(
         attach_to_instance=bool(settings.get("attach_to_instance", False)),
+        create_if_missing=bool(settings.get("create_if_missing", False)),
         program_path=settings.get("program_path"),
     ) as sap:
         sap_result = import_structural_model_from_payload(

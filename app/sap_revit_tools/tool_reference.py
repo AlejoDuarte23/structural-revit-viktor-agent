@@ -224,9 +224,11 @@ class Sap2000Session:
         self,
         *,
         attach_to_instance: bool = True,
+        create_if_missing: bool = False,
         program_path: str | None = None,
     ) -> None:
         self.attach_to_instance = attach_to_instance
+        self.create_if_missing = create_if_missing
         self.program_path = program_path
         self.helper = None
         self.SapObject = None
@@ -279,6 +281,11 @@ class Sap2000Session:
                     self.SapObject = None
 
             if self.SapObject is None:
+                if not self.create_if_missing:
+                    raise RuntimeError(
+                        "Could not attach. In SAP2000 use: Tools -> Set as active instance for API. "
+                        "Also ensure SAP2000 and Python run with the same admin level and are 64-bit."
+                    )
                 self.SapObject = self._create_sap_object(win32)
                 self._owns_application = True
                 if hasattr(self.SapObject, "ApplicationStart"):
@@ -1231,7 +1238,8 @@ def build_worker_input_payload(analytical_model: RevitAnalyticalSapImportModel) 
     return {
         "analytical_model": analytical_model.model_dump(mode="json"),
         "settings": {
-            "attach_to_instance": False,
+            "attach_to_instance": True,
+            "create_if_missing": False,
             "program_path": None,
             "material_name": DEFAULT_STEEL_MATERIAL,
             "concrete_material_name": DEFAULT_CONCRETE_MATERIAL,
