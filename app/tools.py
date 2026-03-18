@@ -16,10 +16,9 @@ from app.viktor_tools.plot_footings_tool import (
     generate_footings_plot_tool,
     show_hide_footings_plot_tool,
 )
-from app.sap_tools.check_sap2000_instance_tool import check_sap2000_instance_tool
-from app.sap_tools.get_support_coordinates_tool import get_support_coordinates_tool
-from app.sap_tools.get_reaction_loads_tool import get_reaction_loads_tool
-from app.sap_tools.get_load_combinations_tool import get_load_combinations_tool
+from app.sap_revit_tools.tool_reference import (
+    build_sap_model_from_analytical_json_tool,
+)
 from app.sap_tools.display_support_coords_table import (
     display_support_coordinates_table_tool,
 )
@@ -43,10 +42,7 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "show_hide_footings_plot": "Show/Hide Footings Plot",
     "create_dummy_workflow_node": "Create Workflow Node",
     "compose_workflow_graph": "Compose Workflow Graph",
-    "check_sap2000_instance": "Check SAP2000 Connection",
-    "get_support_coordinates": "Get Support Coordinates (SAP2000)",
-    "get_reaction_loads": "Get Reaction Loads (SAP2000)",
-    "get_load_combinations": "Get Load Combinations (SAP2000)",
+    "build_sap_model_from_analytical_json": "Build SAP Model From Analytical JSON",
     "display_support_coordinates_table": "Display Support Coordinates",
     "display_reaction_loads_table": "Display Reaction Loads",
 }
@@ -252,10 +248,7 @@ def get_tools() -> list[Any]:
     return [
         create_dummy_workflow_node_tool(),
         compose_workflow_graph_tool(),
-        check_sap2000_instance_tool(),
-        get_support_coordinates_tool(),
-        get_reaction_loads_tool(),
-        get_load_combinations_tool(),
+        build_sap_model_from_analytical_json_tool(),
         display_support_coordinates_table_tool(),
         display_reaction_loads_table_tool(),
         calculate_footing_sizing_tool(),

@@ -38,7 +38,7 @@ async def display_support_coordinates_table_func(ctx: Any, args: str) -> str:
         if not stored_file:
             return (
                 "No support coordinates found in storage. "
-                "Please run 'get_support_coordinates' tool first to extract data from SAP2000."
+                "Please run 'build_sap_model_from_analytical_json' first to populate SAP2000 result storage."
             )
 
         supports_json = stored_file.getvalue_binary().decode("utf-8")
@@ -124,11 +124,11 @@ def display_support_coordinates_table_tool() -> Any:
         description=(
             "Display support node coordinates in Table view. "
             "Reads data from Viktor Storage (key: 'model_support_coordinates') that was previously "
-            "extracted using the 'get_support_coordinates' tool. "
+            "generated using the 'build_sap_model_from_analytical_json' tool. "
             "Shows a table with columns: Joint, X (m), Y (m), Z (m), U1, U2, U3, R1, R2, R3. "
             "Restraints are shown as 0=free, 1=restrained. "
             "The table is automatically displayed in the Table view panel (unless auto_show=False). "
-            "IMPORTANT: Must run 'get_support_coordinates' tool first to extract data from SAP2000."
+            "IMPORTANT: Must run 'build_sap_model_from_analytical_json' first to populate SAP2000 result storage."
         ),
         params_json_schema=DisplaySupportCoordinatesArgs.model_json_schema(),
         on_invoke_tool=display_support_coordinates_table_func,
