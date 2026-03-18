@@ -38,6 +38,13 @@ DEFAULT_APPLY_LOADS = True
 DEFAULT_RUN_ANALYSIS = True
 DEFAULT_INITIALIZE_BLANK_MODEL = True
 DEFAULT_DEAD_SELF_WEIGHT_MULTIPLIER = 0.0
+DEFAULT_DEAD_CASE_NAME = "DL"
+DEFAULT_LIVE_CASE_NAME = "LL"
+DEFAULT_DESIGN_COMBOS: list[tuple[str, dict[str, float]]] = [
+    ("DL_PLUS_LL", {"DL": 1.0, "LL": 1.0}),
+    ("1.2DL_1.5LL", {"DL": 1.2, "LL": 1.5}),
+    ("DL_0.6LL", {"DL": 1.0, "LL": 0.6}),
+]
 
 
 class SourceRefModel(BaseModel):
@@ -665,6 +672,13 @@ def infer_load_pattern_type(load_payload: dict[str, Any]) -> int:
     return CSI_LOADPATTERN_DEAD if "dead" in tokens else CSI_LOADPATTERN_LIVE
 
 
+def canonical_load_case_name(load_payload: dict[str, Any]) -> str:
+    load_pattern_type = infer_load_pattern_type(load_payload)
+    if load_pattern_type == CSI_LOADPATTERN_DEAD:
+        return DEFAULT_DEAD_CASE_NAME
+    return DEFAULT_LIVE_CASE_NAME
+
+
 def ensure_load_pattern(
     SapModel: Any,
     name: str,
@@ -842,12 +856,8 @@ def apply_uniform_area_loads_from_revit_export(
             )
             continue
 
-        load_pattern_name = str(load_payload.get("load_case_name", "")).strip()
-        if not load_pattern_name:
-            skipped.append(f"Skipped area {area_id} load without load_case_name.")
-            continue
-
         load_pattern_type = infer_load_pattern_type(load_payload)
+        load_pattern_name = canonical_load_case_name(load_payload)
         ensure_load_pattern(
             SapModel,
             name=load_pattern_name,
@@ -861,13 +871,6 @@ def apply_uniform_area_loads_from_revit_export(
             pattern_name=load_pattern_name,
             scale_factor=1.0,
         )
-
-        if load_pattern_name not in set(get_all_load_combos(SapModel)):
-            recreate_linear_additive_combo(
-                SapModel,
-                combo_name=load_pattern_name,
-                case_scale_factors={load_pattern_name: 1.0},
-            )
 
         pattern_names.add(load_pattern_name)
         case_names.add(load_pattern_name)
@@ -897,6 +900,32 @@ def apply_uniform_area_loads_from_revit_export(
         "assigned_loads": assigned,
         "skipped": skipped,
     }
+
+
+def create_default_design_combos(
+    SapModel: Any,
+    available_case_names: list[str],
+) -> list[str]:
+    created_combo_names: list[str] = []
+    available_case_set = set(available_case_names)
+
+    for combo_name, case_scale_factors in DEFAULT_DESIGN_COMBOS:
+        filtered_case_scale_factors = {
+            case_name: scale_factor
+            for case_name, scale_factor in case_scale_factors.items()
+            if case_name in available_case_set
+        }
+        if not filtered_case_scale_factors:
+            continue
+
+        recreate_linear_additive_combo(
+            SapModel,
+            combo_name=combo_name,
+            case_scale_factors=filtered_case_scale_factors,
+        )
+        created_combo_names.append(combo_name)
+
+    return created_combo_names
 
 
 def get_point_coords(SapModel: Any, point_name: str) -> tuple[float, float, float]:
@@ -1193,6 +1222,10 @@ async def build_sap_model_from_analytical_json_func(ctx: Any, args: str) -> str:
                     load_payloads=area_loads,
                     default_self_weight_multiplier=DEFAULT_DEAD_SELF_WEIGHT_MULTIPLIER,
                 )
+                loading_result["combos"] = create_default_design_combos(
+                    sap.SapModel,
+                    available_case_names=loading_result["cases"],
+                )
 
             save_path = save_model(
                 sap.SapModel,
@@ -1209,7 +1242,8 @@ async def build_sap_model_from_analytical_json_func(ctx: Any, args: str) -> str:
 
         num_results_per_node = len(next(iter(reactions.values()))) if reactions else 0
         loading_summary = (
-            f"{len(loading_result['assigned_loads'])} assigned area loads"
+            f"{len(loading_result['assigned_loads'])} assigned area loads "
+            f"and {len(loading_result.get('combos', []))} hard-coded combos"
             if loading_result is not None
             else "no area loads assigned"
         )
