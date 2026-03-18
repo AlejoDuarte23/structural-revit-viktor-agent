@@ -177,17 +177,17 @@ def workflow_agent_sync_stream(
                → Call display_support_coordinates_table
 
             3. FOOTING DESIGN (Integrated with SAP2000)
-               - calculate_footing_sizing: Optimize footing geometry to minimize weight
-                 * URL: https://beta.viktor.ai/workspaces/4865/app/editor/2639
+               - calculate_footing_sizing: Run foundation pad sizing
+                 * URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
                  * Automatically loads node coordinates and reaction loads from SAP2000 storage
                  * REQUIRES: build_sap_model_from_analytical_json must be run first
-                 * Uses iterative optimization to find lightest footing satisfying bearing capacity
-                 * Handles eccentric loading (single and biaxial eccentricity cases)
-                 * User provides: material properties (gamma_concrete, gamma_fill), bearing capacity table, min footing length
+                 * Sends soil.q_allow, soil.gamma_c, soil.depth, and soil.b_min to the app
+                 * Sends nodes_section.nodes_table and lc_section.load_cases_table built from SAP2000 storage
+                 * Stores the exported governing pad sizing list in 'footing_sizing_results'
 
                  LOAD COMBINATION SELECTION:
                  * Use 'load_combinations_to_check' to specify which combos to use (e.g., ['ULS2', 'ULS3'])
-                   Tool optimizes footings to satisfy ALL specified combinations per node
+                   Tool includes all specified combinations per node
                  * Can pass single combo name as string (e.g., 'ULS3')
                  * If None, uses all available combos for optimization
 
@@ -258,8 +258,8 @@ def workflow_agent_sync_stream(
                - sap2000_tool: SAP2000 connection check (no URL - connection verification)
                - sap2000_load_combos: Get available load combinations (no URL - SAP2000 query)
                - sap2000_extraction: SAP2000 data extraction step (no URL - represents extraction process)
-               - footing_sizing: Footing sizing optimization (minimize weight)
-                 → URL: https://beta.viktor.ai/workspaces/4865/app/editor/2639
+               - footing_sizing: Foundation pad sizing
+                 → URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
                  → Typically depends on: sap2000_load_combos, sap2000_extraction
                - footing_concrete_rebar: Concrete rebar design per ACI 318-19
                  → URL: https://beta.viktor.ai/workspaces/4864/app/editor/2640
