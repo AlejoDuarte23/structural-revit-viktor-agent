@@ -17,6 +17,7 @@ from tool_reference import (
     ensure_load_pattern,
     get_support_reactions_all_results,
     import_structural_model_from_payload,
+    refresh_view,
     recreate_static_linear_case_from_pattern,
     resolve_supports,
     run_analysis,
@@ -138,6 +139,7 @@ def main() -> None:
                 point_names=sap_result["points"],
                 restraints_by_node_id=supports_by_node_id,
             )
+            refresh_view(sap.SapModel)
 
         if bool(settings.get("apply_loads", True)):
             loading_result = apply_manual_uniform_loads_to_all_slabs(
@@ -151,6 +153,7 @@ def main() -> None:
                 sap.SapModel,
                 available_case_names=loading_result["cases"],
             )
+            refresh_view(sap.SapModel)
 
         save_path = None
         if bool(settings.get("save_model", True)):

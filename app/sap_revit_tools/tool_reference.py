@@ -398,6 +398,20 @@ def ensure_blank_model(SapModel: Any, units: int = 6) -> None:
         raise RuntimeError(f"File.NewBlank failed (ret={ret})")
 
 
+def refresh_view(SapModel: Any) -> None:
+    try:
+        result = SapModel.View.RefreshView(0, False)
+    except TypeError:
+        result = SapModel.View.RefreshView()
+    except Exception:
+        logger.warning("SapModel.View.RefreshView failed.", exc_info=True)
+        return
+
+    ret = result[0] if isinstance(result, tuple) else result
+    if ret not in (None, 0):
+        logger.warning("SapModel.View.RefreshView returned ret=%s", ret)
+
+
 def define_steel_material(
     SapModel: Any,
     material_name: str,
@@ -1178,12 +1192,14 @@ def import_structural_model_from_payload(
 
     define_steel_material(SapModel, material_name=material_name)
     point_names = create_points_from_payload(SapModel, payload)
+    refresh_view(SapModel)
     frame_names = create_frames_from_payload(
         SapModel,
         payload=payload,
         point_names=point_names,
         material_name=material_name,
     )
+    refresh_view(SapModel)
     area_names = create_areas_from_payload(
         SapModel,
         payload=payload,
@@ -1191,6 +1207,7 @@ def import_structural_model_from_payload(
         concrete_material_name=concrete_material_name,
         default_slab_thickness=default_slab_thickness,
     )
+    refresh_view(SapModel)
     return {
         "points": point_names,
         "frames": frame_names,
