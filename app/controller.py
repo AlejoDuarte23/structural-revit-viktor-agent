@@ -136,6 +136,8 @@ def workflow_agent_sync_stream(
 
                - run_footing_acc_automation: Run the ACC footing automation on the selected Autodesk model
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Reads footing data from Viktor Storage key 'footing_sizing_results'
+                 * Sends only footing B, L, x, y, z values to the add-in payload
                  * Prints polling updates while the ACC work item runs
                  * Creates the generated output file directly in ACC in the same folder as the selected model
                  * Does not download the result locally or store it in Viktor Storage
