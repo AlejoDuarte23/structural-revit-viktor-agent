@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+import tempfile
+import uuid
 from pathlib import Path
 from typing import Any, Literal
 
@@ -304,6 +306,21 @@ def run_analysis(SapModel: Any) -> None:
     ret = SapModel.Analyze.RunAnalysis()
     if ret != 0:
         raise RuntimeError(f"Analyze.RunAnalysis failed (ret={ret})")
+
+
+def _build_temp_model_path() -> Path:
+    temp_dir = Path(tempfile.gettempdir()) / "sap2000-analytical-models"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    return temp_dir / f"analytical-model-{uuid.uuid4().hex}.sdb"
+
+
+def save_model(SapModel: Any, target_path: str | Path) -> Path:
+    save_path = Path(target_path).resolve()
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    ret = SapModel.File.Save(str(save_path))
+    if ret != 0:
+        raise RuntimeError(f"SapModel.File.Save failed for {save_path} (ret={ret})")
+    return save_path
 
 
 def ensure_blank_model(SapModel: Any, units: int = 6) -> None:
@@ -1177,12 +1194,10 @@ async def build_sap_model_from_analytical_json_func(ctx: Any, args: str) -> str:
                     default_self_weight_multiplier=DEFAULT_DEAD_SELF_WEIGHT_MULTIPLIER,
                 )
 
-            if DEFAULT_SAVE_MODEL_PATH:
-                save_path = Path(DEFAULT_SAVE_MODEL_PATH).resolve()
-                save_path.parent.mkdir(parents=True, exist_ok=True)
-                ret = sap.SapModel.File.Save(str(save_path))
-                if ret != 0:
-                    raise RuntimeError(f"SapModel.File.Save failed for {save_path} (ret={ret})")
+            save_path = save_model(
+                sap.SapModel,
+                DEFAULT_SAVE_MODEL_PATH or _build_temp_model_path(),
+            )
 
             if DEFAULT_RUN_ANALYSIS:
                 run_analysis(sap.SapModel)
@@ -1199,9 +1214,7 @@ async def build_sap_model_from_analytical_json_func(ctx: Any, args: str) -> str:
             else "no area loads assigned"
         )
         save_note = (
-            f" Model saved to {Path(DEFAULT_SAVE_MODEL_PATH).resolve()}."
-            if DEFAULT_SAVE_MODEL_PATH
-            else ""
+            f" Model saved to {save_path}."
         )
 
         return (
