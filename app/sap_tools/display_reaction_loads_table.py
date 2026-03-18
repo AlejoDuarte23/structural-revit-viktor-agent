@@ -39,7 +39,7 @@ async def display_reaction_loads_table_func(ctx: Any, args: str) -> str:
         if not stored_file:
             return (
                 "No reaction loads found in storage. "
-                "Please run 'get_reaction_loads' tool first to extract data from SAP2000."
+                "Please run 'build_sap_model_from_analytical_json' first to populate SAP2000 result storage."
             )
 
         reactions_json = stored_file.getvalue_binary().decode("utf-8")
@@ -128,12 +128,12 @@ def display_reaction_loads_table_tool() -> Any:
         description=(
             "Display reaction loads in Table view. "
             "Reads data from Viktor Storage (key: 'model_reaction_loads') that was previously "
-            "extracted using the 'get_reaction_loads' tool. "
+            "generated using the 'build_sap_model_from_analytical_json' tool. "
             "Shows a flattened table with all nodes and all load combinations: "
             "Node, Load Combo, F1 (kN), F2 (kN), F3 (kN), M1 (kN·m), M2 (kN·m), M3 (kN·m). "
             "Forces are in kN, moments are in kN·m. "
             "The table is automatically displayed in the Table view panel (unless auto_show=False). "
-            "IMPORTANT: Must run 'get_reaction_loads' tool first to extract data from SAP2000."
+            "IMPORTANT: Must run 'build_sap_model_from_analytical_json' first to populate SAP2000 result storage."
         ),
         params_json_schema=DisplayReactionLoadsArgs.model_json_schema(),
         on_invoke_tool=display_reaction_loads_table_func,
