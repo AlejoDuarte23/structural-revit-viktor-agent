@@ -412,17 +412,16 @@ def get_autodesk_view_visibility(params, **kwargs):
 
 
 class Parametrization(vkt.Parametrization):
-    title = vkt.Text("""# VIKTOR Structural Analysis Agent
+    title = vkt.Text("""# VIKTOR APS Structural Agent
 
-Extract and analyze data from SAP2000 models! 🏗️
+Analyze and update structural foundation workflows from Autodesk to SAP2000 to ACC.
 
 **What I can do:**
-- 📊 Extract support coordinates and reaction loads from SAP2000 via COM
-- 📋 Display extracted data in interactive tables
-- 🏢 View Autodesk models in an embedded viewer
-- 🔧 Design concrete footings according to ACI 318/NSR-10
-- 📈 Visualize data with plots and charts
-- 🔗 Create workflow graphs to document processes
+- 🏢 Inspect and display the selected Autodesk model
+- 🧩 Export the Revit analytical model and create the SAP2000 model
+- 📋 Review support coordinates and reaction results in tables
+- 🔧 Run footing sizing and push the updated footing model back to ACC
+- 🔗 Create workflow graphs to document the engineering process
 
 """)
     autodesk_file = vkt.AutodeskFileField(
