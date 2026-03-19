@@ -77,7 +77,7 @@ def _load_footing_entries_from_storage(vkt: Any) -> list[FootingAddinEntry]:
     raw = _get_storage_text(vkt, FOOTING_SIZING_STORAGE_KEY)
     entries = TypeAdapter(list[FootingStorageEntry]).validate_json(raw)
     normalized = [
-        FootingAddinEntry(B=entry.B, L=entry.L, x=entry.x, y=entry.y, z=entry.z)
+        FootingAddinEntry(B=entry.B, L=entry.L, x=entry.x, y=entry.z, z=entry.y)
         for entry in entries
     ]
     if not normalized:
