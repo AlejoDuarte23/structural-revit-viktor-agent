@@ -7,8 +7,12 @@ from app.viktor_tools.footing_sizing_tool import calculate_footing_sizing_tool
 from app.viktor_tools.footing_concrete_rebar_tool import calculate_footing_concrete_rebar_tool
 from app.viktor_tools.analytical_model_json_tool import (
     extract_analytical_model_json_tool,
+    get_last_extract_analytical_model_json_workitem_tool,
+    poll_extract_analytical_model_json_tool,
 )
 from app.viktor_tools.footing_acc_automation_tool import (
+    get_last_footing_acc_workitem_tool,
+    poll_footing_acc_automation_tool,
     run_footing_acc_automation_tool,
 )
 from app.viktor_tools.autodesk_context_tool import get_autodesk_file_context_tool
@@ -36,8 +40,12 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "calculate_footing_concrete_rebar": "Calculate Footing Concrete Rebar (ACI 318)",
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
-    "extract_analytical_model_json": "Extract Analytical Model JSON",
-    "run_footing_acc_automation": "Run Footing ACC Automation",
+    "extract_analytical_model_json": "Start Analytical Model JSON Automation",
+    "poll_extract_analytical_model_json": "Poll Analytical Model JSON Automation",
+    "get_last_extract_analytical_model_json_workitem": "Get Last Analytical Model JSON Workitem",
+    "run_footing_acc_automation": "Start Footing ACC Automation",
+    "poll_footing_acc_automation": "Poll Footing ACC Automation",
+    "get_last_footing_acc_workitem": "Get Last Footing ACC Workitem",
     "get_autodesk_file_context": "Get Autodesk File Context",
     "show_hide_autodesk_view": "Show/Hide Autodesk Viewer",
     "show_hide_plot": "Show/Hide Plot",
@@ -258,7 +266,11 @@ def get_tools() -> list[Any]:
         calculate_footing_sizing_tool(),
         calculate_footing_concrete_rebar_tool(),
         extract_analytical_model_json_tool(),
+        poll_extract_analytical_model_json_tool(),
+        get_last_extract_analytical_model_json_workitem_tool(),
         run_footing_acc_automation_tool(),
+        poll_footing_acc_automation_tool(),
+        get_last_footing_acc_workitem_tool(),
         get_autodesk_file_context_tool(),
         generate_plot(),
         generate_table(),

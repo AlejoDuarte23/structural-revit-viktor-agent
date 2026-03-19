@@ -128,19 +128,22 @@ def workflow_agent_sync_stream(
             1. SAP2000 WORKER FLOW
                Build the SAP2000 model from the exported Autodesk analytical JSON and store the results:
 
-               - extract_analytical_model_json: Run ACC automation on the selected Autodesk model
+               - extract_analytical_model_json: Start ACC automation on the selected Autodesk model
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
-                 * Prints polling updates while the ACC work item runs
-                 * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * Submits the ACC work item and stores the latest analytical workitem metadata in Viktor Storage
+                 * After starting it, use poll_extract_analytical_model_json to track status
+                 * On success, the poll tool downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * Use get_last_extract_analytical_model_json_workitem to inspect the stored workitem metadata without polling
                  * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
 
-               - run_footing_acc_automation: Run the ACC footing automation on the selected Autodesk model
+               - run_footing_acc_automation: Start the ACC footing automation on the selected Autodesk model
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
                  * Reads footing data from Viktor Storage key 'footing_sizing_results'
                  * Sends only footing B, L, x, y, z values to the add-in payload
-                 * Prints polling updates while the ACC work item runs
-                 * Creates the generated output file directly in ACC in the same folder as the selected model
-                 * Does not download the result locally or store it in Viktor Storage
+                 * Submits the ACC work item and stores the latest footing workitem metadata in Viktor Storage
+                 * After starting it, use poll_footing_acc_automation to track status
+                 * On success, the poll tool creates the generated output file directly in ACC in the same folder as the selected model
+                 * Use get_last_footing_acc_workitem to inspect the stored workitem metadata without polling
                  * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
 
                - build_sap_model_from_analytical_json: Run the SAP2000 worker flow
@@ -153,8 +156,9 @@ def workflow_agent_sync_stream(
                (Tools → Set as active instance for API in SAP2000) before the worker runs.
 
                TYPICAL WORKFLOW:
-               1. extract_analytical_model_json → Export and store analytical JSON
-               2. build_sap_model_from_analytical_json → Build SAP model and populate result storage
+               1. extract_analytical_model_json → Start analytical JSON export
+               2. poll_extract_analytical_model_json until it finishes and stores the JSON
+               3. build_sap_model_from_analytical_json → Build SAP model and populate result storage
 
             2. DATA DISPLAY
                Transform stored SAP2000 data into table views:
