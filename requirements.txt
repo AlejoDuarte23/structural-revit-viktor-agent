@@ -160,10 +160,6 @@ python-multipart==0.0.21
     # via mcp
 pytz==2025.2
     # via pandas
-pywin32==311
-    # via
-    #   graph-tools-for-agents
-    #   mcp
 pyyaml==6.0.3
     # via pre-commit
 referencing==0.37.0
