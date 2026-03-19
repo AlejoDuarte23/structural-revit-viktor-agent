@@ -139,8 +139,8 @@ async def generate_footings_plot_func(ctx: Any, args: str) -> str:
     if nodes_missing_coords:
         return (
             f"❌ Error: Cannot plot footings. Missing coordinates for nodes: {', '.join(nodes_missing_coords)}. "
-            f"Either provide x, y coordinates explicitly or ensure get_support_coordinates has been run first "
-            f"to load node positions from SAP2000 into storage."
+            f"Either provide x, y coordinates explicitly or ensure build_sap_model_from_analytical_json "
+            f"has been run first to load node positions from SAP2000 into storage."
         )
 
     # Step 4: Store plot data for visualization
@@ -191,7 +191,7 @@ def generate_footings_plot_tool() -> Any:
             "AUTOMATIC MODE (Recommended):\n"
             "Simply call with {} (empty parameters) to auto-load:\n"
             "1. Design results from 'calculate_footing_sizing' (dimensions, geometry)\n"
-            "2. Node coordinates from 'get_support_coordinates' (x, y positions)\n"
+            "2. Node coordinates from SAP2000 result storage (x, y positions)\n"
             "The tool will automatically merge this data and create the plot.\n\n"
             "MANUAL MODE:\n"
             "Alternatively, provide explicit 'footings' list with node_name and design parameters "
@@ -203,7 +203,7 @@ def generate_footings_plot_tool() -> Any:
             "- Equal aspect ratio for accurate geometric representation\n\n"
             "After generating, call show_hide_footings_plot with action='show' to display.\n\n"
             "PREREQUISITES:\n"
-            "- get_support_coordinates (for node positions)\n"
+            "- build_sap_model_from_analytical_json (for node positions)\n"
             "- calculate_footing_sizing (for design results) if using automatic mode"
         ),
         params_json_schema=PlotFootingsInput.model_json_schema(),

@@ -125,25 +125,29 @@ def workflow_agent_sync_stream(
 
             YOUR CAPABILITIES:
 
-            1. SAP2000 WORKER FLOW
-               Build the SAP2000 model from the exported Autodesk analytical JSON and store the results:
+            1. ACC / REVIT CONTEXT
+               Work with the selected Autodesk model before running backend flows:
 
-               - extract_analytical_model_json: Run ACC automation on the selected Autodesk model
+               - get_autodesk_file_context: Inspect the selected Autodesk model context
+                 * Returns file metadata such as hub id, project id, item URN, version URN, and ACC output folder id
+                 * Use this when the user wants to verify which ACC/Revit file the app is currently pointing at
+
+               - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
+                 * Shows the Autodesk model selected in the Autodesk model field
+                 * Use action='show' when the user asks to open or display the model
+                 * Use action='hide' when the user asks to close or hide the model viewer
+
+               - extract_analytical_model_json: Get Revit analytical model information
+                 * Runs the ACC automation on the selected Autodesk model
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
                  * Prints polling updates while the ACC work item runs
                  * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
                  * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
 
-               - run_footing_acc_automation: Run the ACC footing automation on the selected Autodesk model
-                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
-                 * Reads footing data from Viktor Storage key 'footing_sizing_results'
-                 * Sends only footing B, L, x, y, z values to the add-in payload
-                 * Prints polling updates while the ACC work item runs
-                 * Creates the generated output file directly in ACC in the same folder as the selected model
-                 * Does not download the result locally or store it in Viktor Storage
-                 * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
+            2. SAP2000 WORKER FLOW
+               Build and run the SAP2000 model from the exported analytical JSON:
 
-               - build_sap_model_from_analytical_json: Run the SAP2000 worker flow
+               - build_sap_model_from_analytical_json: Create and run the SAP2000 model
                  * Reads the analytical JSON from Viktor Storage
                  * Builds the SAP2000 model, assigns supports, assigns slab loads, runs analysis, and stores results
                  * Stores support coordinates under 'model_support_coordinates'
@@ -154,10 +158,10 @@ def workflow_agent_sync_stream(
 
                TYPICAL WORKFLOW:
                1. extract_analytical_model_json → Export and store analytical JSON
-               2. build_sap_model_from_analytical_json → Build SAP model and populate result storage
+               2. build_sap_model_from_analytical_json → Create and run the SAP2000 model
 
-            2. DATA DISPLAY
-               Transform stored SAP2000 data into table views:
+            3. DATA DISPLAY
+               Transform stored SAP2000 data into reviewable outputs:
 
                - display_support_coordinates_table: Show support nodes in table format
                  * Columns: Joint, X (m), Y (m), Z (m), U1, U2, U3, R1, R2, R3
@@ -170,13 +174,7 @@ def workflow_agent_sync_stream(
                  * Automatically shows Table view panel
                  * Must run build_sap_model_from_analytical_json first
 
-               TYPICAL WORKFLOW:
-               User: "Show support coordinates"
-               → Call display_support_coordinates_table
-               User: "Show them in a table"
-               → Call display_support_coordinates_table
-
-            3. FOOTING DESIGN (Integrated with SAP2000)
+            4. FOOTING WORKFLOW
                - calculate_footing_sizing: Run foundation pad sizing
                  * URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
                  * Automatically loads node coordinates and reaction loads from SAP2000 storage
@@ -191,47 +189,35 @@ def workflow_agent_sync_stream(
                  * Can pass single combo name as string (e.g., 'ULS3')
                  * If None, uses all available combos for optimization
 
-               - calculate_footing_concrete_rebar: Detailed concrete design checks per ACI 318-19
-                 * URL: https://beta.viktor.ai/workspaces/4864/app/editor/2640
-                 * Automatically loads node coordinates, reaction loads, AND footing dimensions from storage
-                 * REQUIRES: build_sap_model_from_analytical_json and calculate_footing_sizing must be run first
-                 * Performs: punching shear (two-way), one-way shear (beam), flexure, rebar spacing
-                 * Checks ALL load combinations and identifies critical cases for each check type
-                 * User provides: concrete properties (fc, fy, cover, db)
-                 * Results stored in storage for further use
+               - run_footing_acc_automation: Finalize the ACC footing model
+                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Reads footing data from Viktor Storage key 'footing_sizing_results'
+                 * Sends only footing B, L, x, y, z values to the add-in payload
+                 * Prints polling updates while the ACC work item runs
+                 * Creates the generated output file directly in ACC in the same folder as the selected model
+                 * Does not download the result locally or store it in Viktor Storage
+                 * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
 
-                 LOAD COMBINATION SELECTION:
-                 * Use 'load_combinations_to_check' to specify which combos to check (e.g., ['ULS2', 'ULS3'])
-                   Tool checks ALL specified combinations and finds governing cases
-                 * Can pass single combo name as string (e.g., 'ULS3')
-                 * If None, checks all available combos
+               TYPICAL WORKFLOW:
+               1. get_autodesk_file_context
+               2. show_hide_autodesk_view (when the user wants the model displayed)
+               3. extract_analytical_model_json
+               4. build_sap_model_from_analytical_json
+               5. calculate_footing_sizing
+               6. run_footing_acc_automation
 
-                 TYPICAL WORKFLOW:
-                 1. build_sap_model_from_analytical_json (SAP2000 data + storage)
-                 2. calculate_footing_sizing (optimize dimensions)
-                 3. calculate_footing_concrete_rebar (detailed ACI 318 checks) ← This tool
-
-            4. VISUALIZATION TOOLS
+            5. VISUALIZATION TOOLS
                - generate_plotly: Create line/bar plots from x and y data
                  * Must call show_hide_plot with action="show" after to display
 
                - generate_table: Create custom tables with data and column headers
                  * Must call show_hide_table with action="show" after to display
 
-               - get_autodesk_file_context: Inspect the selected Autodesk model context for testing
-                 * Returns file metadata such as hub id, project id, item URN, version URN, and ACC output folder id
-                 * Use this when the user wants to verify what Autodesk context the app currently sees
-
-               - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
-                 * Shows the Autodesk model selected in the Autodesk model field
-                 * Use 'show' when the user asks to open or display the model
-                 * Use 'hide' when the user asks to close or hide the model viewer
-
                - generate_footings_plot: Create plan view visualization of footing designs
                  * AUTOMATIC WORKFLOW (Recommended):
                    → Just call with {} (empty parameters) - no manual data entry needed!
                    → Auto-loads design results from calculate_footing_sizing storage
-                   → Auto-loads node coordinates from get_support_coordinates storage
+                   → Auto-loads node coordinates from SAP2000 result storage
                    → Automatically merges data and creates plot
                  * VISUAL OUTPUT:
                    → Footings shown as light gray rectangles with dimensions
@@ -239,7 +225,7 @@ def workflow_agent_sync_stream(
                    → Node labels and hover info
                    → Equal aspect ratio for accurate geometric representation
                  * PREREQUISITES:
-                   → get_support_coordinates (for node x,y positions)
+                   → build_sap_model_from_analytical_json (for node x,y positions)
                    → calculate_footing_sizing (for design dimensions)
                  * Must call show_hide_footings_plot with action="show" after to display
 
@@ -255,24 +241,31 @@ def workflow_agent_sync_stream(
                - compose_workflow_graph: Combine nodes into DAG visualization
 
                Available node types for workflows:
-               - sap2000_tool: SAP2000 connection check (no URL - connection verification)
-               - sap2000_load_combos: Get available load combinations (no URL - SAP2000 query)
-               - sap2000_extraction: SAP2000 data extraction step (no URL - represents extraction process)
-               - footing_sizing: Foundation pad sizing
+               - get_autodesk_file_context: "Get ACC File Information"
+               - show_hide_autodesk_view: "Display Revit Model"
+                 → Typically depends on: get_autodesk_file_context
+               - extract_analytical_model_json: "Get Revit Analytical Model"
+                 → Typically depends on: get_autodesk_file_context
+               - build_sap_model_from_analytical_json: "Create SAP Model"
+                 → Typically depends on: extract_analytical_model_json
+               - display_support_coordinates_table: "Display Coordinate Table"
+                 → Typically depends on: build_sap_model_from_analytical_json
+               - calculate_footing_sizing: "Footing Sizing"
                  → URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
-                 → Typically depends on: sap2000_load_combos, sap2000_extraction
-               - footing_concrete_rebar: Concrete rebar design per ACI 318-19
-                 → URL: https://beta.viktor.ai/workspaces/4864/app/editor/2640
-                 → Typically depends on: footing_sizing (requires footing dimensions)
+                 → Typically depends on: build_sap_model_from_analytical_json
+               - run_footing_acc_automation: "Finalize ACC Footing Model"
+                 → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_footing_sizing
                - plot_output: Generic visualization node (no URL)
                - table_output: Table display node (no URL)
                - footings_plot_output: Footing plan view visualization node (no URL)
-                 → Typically depends on: footing_sizing
+                 → Typically depends on: calculate_footing_sizing
 
             GENERAL APPROACH:
-            - Extract data from SAP2000 when requested
-            - Display extracted data in tables for user review
-            - Use footing design tool with extracted data (future integration)
+            - Start from the selected ACC/Revit model context
+            - Show the Autodesk viewer when the user wants to inspect the model
+            - Export analytical data before building the SAP2000 model
+            - Display support coordinates when the user wants a quick verification table
+            - Run footing sizing before the ACC footing automation
             - Create workflow graphs to document process flow (optional)
             """
                 ),

@@ -38,6 +38,60 @@ export class WorkflowGraph {
           <text x="22" y="24" fill="white" font-family="system-ui" font-size="24" font-weight="700" text-anchor="middle" dominant-baseline="middle">S</text>
         </svg>`
       },
+      get_autodesk_file_context: {
+        bg: "#F6C28B",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z"></path>
+          <path d="M3 7.5V16.5L12 21l9-4.5V7.5"></path>
+          <circle cx="12" cy="12" r="1.5"></circle>
+        </svg>`
+      },
+      show_hide_autodesk_view: {
+        bg: "#FFFFFF",
+        isOutput: true,
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>`
+      },
+      extract_analytical_model_json: {
+        bg: "#F6C28B",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z"></path>
+          <path d="M12 12 20 8"></path>
+          <path d="M12 12 4 8"></path>
+          <path d="M12 12v9"></path>
+        </svg>`
+      },
+      build_sap_model_from_analytical_json: {
+        bg: "#B8D4F1",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" style="width: 40px; height: 40px;">
+          <rect x="2" y="2" width="40" height="40" rx="10" ry="10" fill="#4285f4"/>
+          <text x="22" y="24" fill="white" font-family="system-ui" font-size="24" font-weight="700" text-anchor="middle" dominant-baseline="middle">S</text>
+        </svg>`
+      },
+      display_support_coordinates_table: {
+        bg: "#FFFFFF",
+        isOutput: true,
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+          <line x1="3" y1="9" x2="21" y2="9"></line>
+          <line x1="3" y1="15" x2="21" y2="15"></line>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+          <line x1="15" y1="3" x2="15" y2="21"></line>
+        </svg>`
+      },
+      display_reaction_loads_table: {
+        bg: "#FFFFFF",
+        isOutput: true,
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+          <line x1="3" y1="9" x2="21" y2="9"></line>
+          <line x1="3" y1="15" x2="21" y2="15"></line>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+          <line x1="15" y1="3" x2="15" y2="21"></line>
+        </svg>`
+      },
       footing_design: {
         bg: "#C5E8B7",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -46,6 +100,40 @@ export class WorkflowGraph {
           <line x1="3" y1="18" x2="21" y2="18"></line>
           <line x1="9" y1="10" x2="9" y2="2"></line>
           <line x1="15" y1="10" x2="15" y2="2"></line>
+        </svg>`
+      },
+      footing_sizing: {
+        bg: "#C5E8B7",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="18" width="18" height="4"></rect>
+          <rect x="7" y="10" width="10" height="8"></rect>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+          <line x1="9" y1="10" x2="9" y2="2"></line>
+          <line x1="15" y1="10" x2="15" y2="2"></line>
+        </svg>`
+      },
+      calculate_footing_sizing: {
+        bg: "#C5E8B7",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="18" width="18" height="4"></rect>
+          <rect x="7" y="10" width="10" height="8"></rect>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+          <line x1="9" y1="10" x2="9" y2="2"></line>
+          <line x1="15" y1="10" x2="15" y2="2"></line>
+        </svg>`
+      },
+      run_footing_acc_automation: {
+        bg: "#F6C28B",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v4"></path>
+          <path d="m16.2 4.8-2.4 2.4"></path>
+          <path d="M22 12h-4"></path>
+          <path d="m19.2 16.2-2.4-2.4"></path>
+          <path d="M12 22v-4"></path>
+          <path d="m7.8 19.2 2.4-2.4"></path>
+          <path d="M2 12h4"></path>
+          <path d="m4.8 7.8 2.4 2.4"></path>
+          <circle cx="12" cy="12" r="3"></circle>
         </svg>`
       },
       plot_output: { 

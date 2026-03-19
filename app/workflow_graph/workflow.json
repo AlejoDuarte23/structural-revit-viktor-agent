@@ -1,43 +1,88 @@
 {
   "nodes": [
     {
-      "id": "load_combos",
-      "title": "Get Load Combinations",
-      "type": "sap2000_load_combos",
+      "id": "acc_file_information",
+      "title": "Get ACC File Information",
+      "type": "get_autodesk_file_context",
       "url": null,
       "depends_on": []
     },
     {
-      "id": "sap_extract",
-      "title": "SAP2000 Data Extraction",
-      "type": "sap2000_extraction",
+      "id": "display_revit_model",
+      "title": "Display Revit Model",
+      "type": "show_hide_autodesk_view",
       "url": null,
-      "depends_on": []
-    },
-    {
-      "id": "footing_design",
-      "title": "Footing Design",
-      "type": "footing_design",
-      "url": "https://beta.viktor.ai/workspaces/4800/app/editor/2581",
       "depends_on": [
         {
-          "node_id": "load_combos",
-          "kind": "default"
-        },
-        {
-          "node_id": "sap_extract",
+          "node_id": "acc_file_information",
           "kind": "default"
         }
       ]
     },
     {
-      "id": "table_out",
-      "title": "Results Table",
-      "type": "table_output",
+      "id": "revit_analytical_model",
+      "title": "Get Revit Analytical Model",
+      "type": "extract_analytical_model_json",
       "url": null,
       "depends_on": [
         {
-          "node_id": "footing_design",
+          "node_id": "acc_file_information",
+          "kind": "default"
+        }
+      ]
+    },
+    {
+      "id": "sap_model",
+      "title": "Create SAP Model",
+      "type": "build_sap_model_from_analytical_json",
+      "url": null,
+      "depends_on": [
+        {
+          "node_id": "revit_analytical_model",
+          "kind": "default"
+        }
+      ]
+    },
+    {
+      "id": "coordinate_table",
+      "title": "Display Coordinate Table",
+      "type": "display_support_coordinates_table",
+      "url": null,
+      "depends_on": [
+        {
+          "node_id": "sap_model",
+          "kind": "default"
+        }
+      ]
+    },
+    {
+      "id": "footing_sizing",
+      "title": "Footing Sizing",
+      "type": "calculate_footing_sizing",
+      "url": "https://demo.viktor.ai/workspaces/2141/app/editor/11536",
+      "depends_on": [
+        {
+          "node_id": "sap_model",
+          "kind": "default"
+        }
+      ]
+    },
+    {
+      "id": "acc_footing_model",
+      "title": "Finalize ACC Footing Model",
+      "type": "run_footing_acc_automation",
+      "url": null,
+      "depends_on": [
+        {
+          "node_id": "acc_file_information",
+          "kind": "default"
+        },
+        {
+          "node_id": "sap_model",
+          "kind": "default"
+        },
+        {
+          "node_id": "footing_sizing",
           "kind": "default"
         }
       ]
