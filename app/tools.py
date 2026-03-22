@@ -4,7 +4,6 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field, Json
 
 from app.viktor_tools.footing_sizing_tool import calculate_footing_sizing_tool
-from app.viktor_tools.footing_concrete_rebar_tool import calculate_footing_concrete_rebar_tool
 from app.viktor_tools.analytical_model_json_tool import (
     extract_analytical_model_json_tool,
 )
@@ -32,22 +31,21 @@ from app.sap_tools.display_reaction_loads_table import (
 
 # Friendly display names for tools in chat
 TOOL_DISPLAY_NAMES: dict[str, str] = {
-    "calculate_footing_sizing": "Calculate Footing Sizing (Optimization)",
-    "calculate_footing_concrete_rebar": "Calculate Footing Concrete Rebar (ACI 318)",
+    "calculate_footing_sizing": "Footing Sizing",
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
-    "extract_analytical_model_json": "Extract Analytical Model JSON",
-    "run_footing_acc_automation": "Run Footing ACC Automation",
-    "get_autodesk_file_context": "Get Autodesk File Context",
-    "show_hide_autodesk_view": "Show/Hide Autodesk Viewer",
+    "extract_analytical_model_json": "Get Revit Analytical Model",
+    "run_footing_acc_automation": "Finalize ACC Footing Model",
+    "get_autodesk_file_context": "Get ACC File Information",
+    "show_hide_autodesk_view": "Display Revit Model",
     "show_hide_plot": "Show/Hide Plot",
     "show_hide_table": "Show/Hide Table",
     "generate_footings_plot": "Generate Footings Plot",
     "show_hide_footings_plot": "Show/Hide Footings Plot",
     "create_dummy_workflow_node": "Create Workflow Node",
     "compose_workflow_graph": "Compose Workflow Graph",
-    "build_sap_model_from_analytical_json": "Build SAP Model From Analytical JSON",
-    "display_support_coordinates_table": "Display Support Coordinates",
+    "build_sap_model_from_analytical_json": "Create SAP Model",
+    "display_support_coordinates_table": "Display Coordinate Table",
     "display_reaction_loads_table": "Display Reaction Loads",
 }
 
@@ -95,7 +93,14 @@ class DummyWorkflowNode(BaseModel):
         "sap2000_load_combos",
         "sap2000_extraction",
         "footing_sizing",
-        "footing_concrete_rebar",
+        "calculate_footing_sizing",
+        "get_autodesk_file_context",
+        "show_hide_autodesk_view",
+        "extract_analytical_model_json",
+        "build_sap_model_from_analytical_json",
+        "display_support_coordinates_table",
+        "display_reaction_loads_table",
+        "run_footing_acc_automation",
         "plot_output",
         "table_output",
         "footings_plot_output",
@@ -103,7 +108,11 @@ class DummyWorkflowNode(BaseModel):
     label: str = Field(..., description="Human-readable label for the node")
     url: str | None = Field(
         default=None,
-        description="URL to the VIKTOR app tool. Leave empty/null for output nodes (plot_output, table_output, footings_plot_output) as they are local visualization tools without URLs.",
+        description=(
+            "Optional URL to the VIKTOR app tool. Leave empty/null for local visualization "
+            "nodes, viewer nodes, storage-backed automation nodes, and backend workflow steps "
+            "that do not open a dedicated app page."
+        ),
     )
     inputs: Json[Any] = Field(
         default="{}",
@@ -193,9 +202,23 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
     from app.workflow_graph.models import Connection, Node, Workflow
     from app.workflow_graph.viewer import WorkflowViewer
 
-    # Default fallback URL (not applied to output nodes)
+    # Default fallback URL (not applied to non-URL workflow steps)
     default_url = "https://beta.viktor.ai/workspaces/4672/app/editor/2394"
-    output_node_types = {"plot_output", "table_output", "footings_plot_output"}
+    non_url_node_types = {
+        "sap2000_tool",
+        "sap2000_load_combos",
+        "sap2000_extraction",
+        "get_autodesk_file_context",
+        "show_hide_autodesk_view",
+        "extract_analytical_model_json",
+        "build_sap_model_from_analytical_json",
+        "display_support_coordinates_table",
+        "display_reaction_loads_table",
+        "run_footing_acc_automation",
+        "plot_output",
+        "table_output",
+        "footings_plot_output",
+    }
 
     workflow = Workflow(
         nodes=[
@@ -204,7 +227,7 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
                 title=n.label,
                 type=n.node_type,
                 url=None
-                if n.node_type in output_node_types
+                if n.node_type in non_url_node_types
                 else (n.url or default_url),
                 depends_on=[Connection(node_id=d) for d in n.depends_on],
             )
@@ -256,7 +279,6 @@ def get_tools() -> list[Any]:
         display_support_coordinates_table_tool(),
         display_reaction_loads_table_tool(),
         calculate_footing_sizing_tool(),
-        calculate_footing_concrete_rebar_tool(),
         extract_analytical_model_json_tool(),
         run_footing_acc_automation_tool(),
         get_autodesk_file_context_tool(),
