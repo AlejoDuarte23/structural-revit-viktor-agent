@@ -157,17 +157,6 @@ export class WorkflowGraph {
           <line x1="15" y1="3" x2="15" y2="21"></line>
         </svg>`
       },
-      footings_plot_output: {
-        bg: "#FFFFFF",
-        isOutput: true,
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="4" y="4" width="6" height="6"></rect>
-          <rect x="14" y="4" width="6" height="6"></rect>
-          <rect x="4" y="14" width="6" height="6"></rect>
-          <rect x="14" y="14" width="6" height="6"></rect>
-          <rect x="2" y="2" width="20" height="20" rx="2"></rect>
-        </svg>`
-      },
       default: { 
         bg: "#E5E5E5",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

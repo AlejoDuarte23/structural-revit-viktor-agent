@@ -213,26 +213,9 @@ def workflow_agent_sync_stream(
                - generate_table: Create custom tables with data and column headers
                  * Must call show_hide_table with action="show" after to display
 
-               - generate_footings_plot: Create plan view visualization of footing designs
-                 * AUTOMATIC WORKFLOW (Recommended):
-                   → Just call with {} (empty parameters) - no manual data entry needed!
-                   → Auto-loads design results from calculate_footing_sizing storage
-                   → Auto-loads node coordinates from SAP2000 result storage
-                   → Automatically merges data and creates plot
-                 * VISUAL OUTPUT:
-                   → Footings shown as light gray rectangles with dimensions
-                   → Pedestals shown as dark gray rectangles
-                   → Node labels and hover info
-                   → Equal aspect ratio for accurate geometric representation
-                 * PREREQUISITES:
-                   → build_sap_model_from_analytical_json (for node x,y positions)
-                   → calculate_footing_sizing (for design dimensions)
-                 * Must call show_hide_footings_plot with action="show" after to display
-
                - show_hide_plot: Control Plot view panel visibility
                - show_hide_table: Control Table view panel visibility
                - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
-               - show_hide_footings_plot: Control Footings Plot view panel visibility
 
             6. WORKFLOW GRAPHS (Optional)
                Create visual workflow diagrams to document engineering processes:
@@ -257,8 +240,6 @@ def workflow_agent_sync_stream(
                  → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_footing_sizing
                - plot_output: Generic visualization node (no URL)
                - table_output: Table display node (no URL)
-               - footings_plot_output: Footing plan view visualization node (no URL)
-                 → Typically depends on: calculate_footing_sizing
 
             GENERAL APPROACH:
             - Start from the selected ACC/Revit model context
@@ -412,16 +393,16 @@ def get_autodesk_view_visibility(params, **kwargs):
 
 
 class Parametrization(vkt.Parametrization):
-    title = vkt.Text("""# VIKTOR APS Structural Agent
+    title = vkt.Text("""# VIKTOR Workflow Agent
 
-Analyze and update structural foundation workflows from Autodesk to SAP2000 to ACC.
+Support structural engineering workflows across Autodesk, SAP2000, ACC, and existing VIKTOR apps.
 
 **What I can do:**
-- 🏢 Inspect and display the selected Autodesk model
-- 🧩 Export the Revit analytical model and create the SAP2000 model
-- 📋 Review support coordinates and reaction results in tables
-- 🔧 Run footing sizing and push the updated footing model back to ACC
-- 🔗 Create workflow graphs to document the engineering process
+- 🔗 Connect to ACC
+- 🏢 Use the Autodesk API
+- 🧩 Integrate with SAP2000
+- ⚙️ Use existing VIKTOR apps
+- 📊 Analyze multiple design alternatives
 
 """)
     autodesk_file = vkt.AutodeskFileField(

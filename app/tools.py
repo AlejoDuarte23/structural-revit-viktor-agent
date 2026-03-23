@@ -14,10 +14,6 @@ from app.viktor_tools.autodesk_context_tool import get_autodesk_file_context_too
 from app.viktor_tools.autodesk_view_tool import show_hide_autodesk_view_tool
 from app.viktor_tools.plotting_tool import generate_plot, show_hide_plot_tool
 from app.viktor_tools.table_tool import generate_table, show_hide_table_tool
-from app.viktor_tools.plot_footings_tool import (
-    generate_footings_plot_tool,
-    show_hide_footings_plot_tool,
-)
 from app.sap_revit_tools.tool_reference_comptypes import (
     build_sap_model_from_analytical_json_comptypes_tool as build_sap_model_from_analytical_json_tool,
 )
@@ -40,8 +36,6 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "show_hide_autodesk_view": "Display Revit Model",
     "show_hide_plot": "Show/Hide Plot",
     "show_hide_table": "Show/Hide Table",
-    "generate_footings_plot": "Generate Footings Plot",
-    "show_hide_footings_plot": "Show/Hide Footings Plot",
     "create_dummy_workflow_node": "Create Workflow Node",
     "compose_workflow_graph": "Compose Workflow Graph",
     "build_sap_model_from_analytical_json": "Create SAP Model",
@@ -103,7 +97,6 @@ class DummyWorkflowNode(BaseModel):
         "run_footing_acc_automation",
         "plot_output",
         "table_output",
-        "footings_plot_output",
     ] = Field(..., description="Type of workflow node to add to the graph")
     label: str = Field(..., description="Human-readable label for the node")
     url: str | None = Field(
@@ -217,7 +210,6 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
         "run_footing_acc_automation",
         "plot_output",
         "table_output",
-        "footings_plot_output",
     }
 
     workflow = Workflow(
@@ -287,6 +279,4 @@ def get_tools() -> list[Any]:
         show_hide_autodesk_view_tool(),
         show_hide_plot_tool(),
         show_hide_table_tool(),
-        generate_footings_plot_tool(),
-        show_hide_footings_plot_tool(),
     ]
