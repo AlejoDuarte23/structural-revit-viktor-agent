@@ -213,26 +213,9 @@ def workflow_agent_sync_stream(
                - generate_table: Create custom tables with data and column headers
                  * Must call show_hide_table with action="show" after to display
 
-               - generate_footings_plot: Create plan view visualization of footing designs
-                 * AUTOMATIC WORKFLOW (Recommended):
-                   → Just call with {} (empty parameters) - no manual data entry needed!
-                   → Auto-loads design results from calculate_footing_sizing storage
-                   → Auto-loads node coordinates from SAP2000 result storage
-                   → Automatically merges data and creates plot
-                 * VISUAL OUTPUT:
-                   → Footings shown as light gray rectangles with dimensions
-                   → Pedestals shown as dark gray rectangles
-                   → Node labels and hover info
-                   → Equal aspect ratio for accurate geometric representation
-                 * PREREQUISITES:
-                   → build_sap_model_from_analytical_json (for node x,y positions)
-                   → calculate_footing_sizing (for design dimensions)
-                 * Must call show_hide_footings_plot with action="show" after to display
-
                - show_hide_plot: Control Plot view panel visibility
                - show_hide_table: Control Table view panel visibility
                - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
-               - show_hide_footings_plot: Control Footings Plot view panel visibility
 
             6. WORKFLOW GRAPHS (Optional)
                Create visual workflow diagrams to document engineering processes:
@@ -257,8 +240,6 @@ def workflow_agent_sync_stream(
                  → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_footing_sizing
                - plot_output: Generic visualization node (no URL)
                - table_output: Table display node (no URL)
-               - footings_plot_output: Footing plan view visualization node (no URL)
-                 → Typically depends on: calculate_footing_sizing
 
             GENERAL APPROACH:
             - Start from the selected ACC/Revit model context
