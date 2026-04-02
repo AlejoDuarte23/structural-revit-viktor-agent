@@ -78,8 +78,8 @@ class WorkflowViewer:
       graph.relayout({{ resetDragged: true }});
       graph.render();
       
-      // Auto-fit to view on initial load
-      setTimeout(() => graph.fitToView(), 50);
+      // Auto-fit to view on initial load with 1.25x zoom multiplier
+      setTimeout(() => graph.fitToView(1.25), 50);
 
       // Zoom control buttons
       document.getElementById("zoom-in").addEventListener("click", () => graph.zoomIn());

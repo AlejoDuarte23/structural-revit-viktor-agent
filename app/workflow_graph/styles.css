@@ -4,7 +4,7 @@
   --edge-w: 8px;
   --gap-x: 60px;
   --gap-y: 120px;
-  --overlay-w: min(420px, calc(100vw - 40px));
+  --overlay-w: min(225px, calc(100vw - 40px));
   --panel-border: rgba(15, 23, 42, 0.08);
   --panel-shadow: 0 22px 50px rgba(15, 23, 42, 0.14);
 }
@@ -55,11 +55,37 @@ body {
   width: var(--overlay-w);
   max-height: calc(100% - 40px);
   z-index: 120;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   pointer-events: auto;
   opacity: 1;
   transform: translateY(0);
   transition: opacity 180ms ease, transform 180ms ease;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.2) transparent;
+  filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.05))
+          drop-shadow(0 6px 16px rgba(15, 23, 42, 0.06))
+          drop-shadow(0 12px 32px rgba(15, 23, 42, 0.04));
+}
+
+/* Custom scrollbar for webkit browsers (Chrome, Safari, Edge) */
+.workflow-overlay::-webkit-scrollbar {
+  width: 6px;
+}
+
+.workflow-overlay::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.workflow-overlay::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.2);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.workflow-overlay::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.35);
 }
 
 .workflow-overlay.is-hidden {
@@ -70,43 +96,51 @@ body {
 
 .workflow-panel {
   display: grid;
-  gap: 14px;
+  gap: 7px;
 }
 
 .workflow-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 7px;
 }
 
 .workflow-panel-kicker {
-  font-size: 14px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: rgba(15, 23, 42, 0.68);
+  color: rgba(15, 23, 42, 0.55);
 }
 
 .workflow-panel-chip {
   display: inline-flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 4px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.94);
-  border: 1px solid var(--panel-border);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-  font-size: 13px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 255, 255, 0.75) 100%
+  );
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 2px 6px rgba(15, 23, 42, 0.04),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+  font-size: 9px;
   font-weight: 600;
   color: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(8px);
 }
 
 .workflow-card {
-  background: rgba(255,255,255,0.95);
-  border: 1px solid var(--panel-border);
-  border-radius: 28px;
-  box-shadow: var(--panel-shadow);
-  padding: 22px;
-  backdrop-filter: blur(10px);
+  background: transparent;
+  border: none;
+  border-radius: 20px;
+  box-shadow: none;
+  padding: 9px;
+  backdrop-filter: none;
 }
 
 .workflow-card-compact {
@@ -116,39 +150,51 @@ body {
 
 .workflow-card-copy h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 11px;
   line-height: 1.15;
   color: #111827;
+  font-weight: 700;
 }
 
 .workflow-card-copy p {
-  margin: 8px 0 0 0;
-  font-size: 15px;
-  line-height: 1.45;
+  margin: 4px 0 0 0;
+  font-size: 10px;
+  line-height: 1.4;
   color: rgba(55, 65, 81, 0.78);
 }
 
 .workflow-card-surface {
-  margin-top: 18px;
-  background: rgba(15, 23, 42, 0.035);
-  border-radius: 22px;
-  padding: 18px;
+  margin-top: 7px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 255, 255, 0.75) 100%
+  );
+  border-radius: 16px;
+  padding: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 3px 8px rgba(15, 23, 42, 0.06),
+    0 8px 20px rgba(15, 23, 42, 0.04),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+  backdrop-filter: blur(16px) saturate(1.2);
 }
 
 .workflow-plan-summary {
   display: grid;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 5px;
+  margin-bottom: 7px;
 }
 
 .workflow-plan-count {
-  font-size: 15px;
+  font-size: 9px;
   font-weight: 600;
   color: rgba(17, 24, 39, 0.72);
 }
 
 .workflow-progress-bar {
-  height: 8px;
+  height: 5px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.08);
   overflow: hidden;
@@ -164,7 +210,37 @@ body {
 .workflow-plan-list,
 .workflow-progress-list {
   display: grid;
-  gap: 10px;
+  gap: 5px;
+  max-height: 242px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.15) rgba(15, 23, 42, 0.03);
+}
+
+/* Custom scrollbar for plan list (webkit) */
+.workflow-plan-list::-webkit-scrollbar,
+.workflow-progress-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.workflow-plan-list::-webkit-scrollbar-track,
+.workflow-progress-list::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.03);
+  border-radius: 3px;
+}
+
+.workflow-plan-list::-webkit-scrollbar-thumb,
+.workflow-progress-list::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.15);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.workflow-plan-list::-webkit-scrollbar-thumb:hover,
+.workflow-progress-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.28);
 }
 
 .workflow-todo {
@@ -176,7 +252,7 @@ body {
   width: 100%;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 7px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -207,7 +283,7 @@ body {
 
 .workflow-todo-label,
 .workflow-progress-step-label {
-  font-size: 15px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.35;
   color: #111827;
@@ -216,23 +292,23 @@ body {
 .workflow-todo-description,
 .workflow-progress-step-description,
 .workflow-progress-caption {
-  font-size: 13px;
+  font-size: 9px;
   line-height: 1.45;
   color: rgba(55, 65, 81, 0.74);
 }
 
 .workflow-todo-chevron {
   margin-left: auto;
-  font-size: 14px;
+  font-size: 10px;
   line-height: 1;
   color: rgba(55, 65, 81, 0.5);
 }
 
 .workflow-status-badge {
   display: inline-flex;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
   border-radius: 999px;
   position: relative;
   margin-top: 1px;
@@ -251,10 +327,10 @@ body {
 .workflow-status-completed::after {
   content: "";
   position: absolute;
-  left: 6px;
-  top: 3px;
-  width: 6px;
-  height: 10px;
+  left: 4px;
+  top: 2px;
+  width: 3px;
+  height: 6px;
   border-right: 2px solid #fff;
   border-bottom: 2px solid #fff;
   transform: rotate(45deg);
@@ -277,14 +353,14 @@ body {
 .workflow-status-failed::after {
   content: "";
   position: absolute;
-  inset: 5px;
+  inset: 4px;
   border-radius: 999px;
   background: #b91c1c;
 }
 
 .workflow-plan-more {
-  padding-left: 34px;
-  font-size: 13px;
+  padding-left: 21px;
+  font-size: 9px;
   font-weight: 600;
   color: rgba(55, 65, 81, 0.72);
 }

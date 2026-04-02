@@ -270,7 +270,7 @@ export class WorkflowGraph {
     this._applyTransform();
   }
 
-  fitToView() {
+  fitToView(zoomMultiplier = null) {
     const nodes = Array.isArray(this.data.nodes) ? this.data.nodes : [];
     if (nodes.length === 0) return;
 
@@ -299,7 +299,14 @@ export class WorkflowGraph {
     // Calculate scale to fit
     const scaleX = (stageW - padding * 2) / contentW;
     const scaleY = (stageH - padding * 2) / contentH;
-    this.scale = Math.min(1, Math.min(scaleX, scaleY)); // Don't zoom in beyond 100%
+    let calculatedScale = Math.min(scaleX, scaleY);
+
+    // Apply zoom multiplier if provided (for initial load), otherwise cap at 100%
+    if (zoomMultiplier !== null) {
+      this.scale = Math.min(2, calculatedScale * zoomMultiplier);
+    } else {
+      this.scale = Math.min(1, calculatedScale);
+    }
 
     // Center the content
     const scaledW = contentW * this.scale;
@@ -495,23 +502,20 @@ export class WorkflowGraph {
     if (!this.overlayEl) return;
 
     const plan = this.canvasState.plan;
-    const progress = this.canvasState.progress;
-    if (!plan && !progress) {
+    // Remove progress display - only show plan
+    if (!plan) {
       this.overlayEl.className = "workflow-overlay is-hidden";
       this.overlayEl.innerHTML = "";
       return;
     }
 
-    const workflowName = this.canvasState.workflow_name || "Workflow";
     this.overlayEl.className = "workflow-overlay";
     this.overlayEl.innerHTML = `
       <div class="workflow-panel">
         <div class="workflow-panel-header">
           <span class="workflow-panel-kicker">Plan</span>
-          <span class="workflow-panel-chip">${escapeHtml(workflowName)}</span>
         </div>
         ${plan ? this._renderPlanMarkup(plan) : ""}
-        ${progress ? this._renderProgressMarkup(progress) : ""}
       </div>
     `;
 
@@ -523,9 +527,6 @@ export class WorkflowGraph {
     const total = todos.length;
     const completed = todos.filter((todo) => todo.status === "completed").length;
     const percent = total ? Math.round((completed / total) * 100) : 0;
-    const maxVisible = Math.max(1, plan.max_visible_todos || 4);
-    const visibleTodos = todos.slice(0, maxVisible);
-    const remaining = Math.max(0, total - visibleTodos.length);
 
     return `
       <section class="workflow-card">
@@ -541,8 +542,7 @@ export class WorkflowGraph {
             </div>
           </div>
           <div class="workflow-plan-list">
-            ${visibleTodos.map((todo) => this._renderTodoMarkup(todo)).join("")}
-            ${remaining > 0 ? `<div class="workflow-plan-more">... ${remaining} more</div>` : ""}
+            ${todos.map((todo) => this._renderTodoMarkup(todo)).join("")}
           </div>
         </div>
       </section>

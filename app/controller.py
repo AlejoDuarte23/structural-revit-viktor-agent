@@ -220,13 +220,28 @@ def workflow_agent_sync_stream(
                - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
 
             6. WORKFLOW GRAPHS (Optional)
-               Create visual workflow diagrams to document engineering processes:
+               Create visual workflow diagrams to document engineering processes.
 
+               **CRITICAL: Always Track Task Progress**
+               When a workflow plan exists, you MUST update task statuses as you work:
+               - Mark tasks as "in_progress" when you START executing them
+               - Mark tasks as "completed" immediately when you FINISH them successfully
+               - Mark tasks as "failed" if they encounter errors
+               - Use 'update_workflow_plan' after each task state change
+
+               Tools available:
                - create_dummy_workflow_node: Create individual nodes
                - compose_workflow_graph: Combine nodes into DAG visualization
                - set_workflow_plan: Populate the plan card shown on the workflow graph canvas
                - update_workflow_plan: Update plan items and statuses on the workflow graph
                - set_workflow_progress: Show or clear the execution progress tracker below the plan
+
+               Example workflow with status updates:
+               1. Start task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "in_progress"}])
+               2. Execute: extract_analytical_model_json(...)
+               3. Complete task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "completed"}])
+               4. Start next task: update_workflow_plan(todos=[{"id": "build_sap_model", "status": "in_progress"}])
+               5. And so on...
 
                Available node types for workflows:
                - get_autodesk_file_context: "Get ACC File Information"
@@ -253,6 +268,10 @@ def workflow_agent_sync_stream(
             - Display support coordinates when the user wants a quick verification table
             - Run footing sizing before the ACC footing automation
             - Create workflow graphs to document process flow (optional)
+            - **ALWAYS update plan task statuses** when a workflow plan is active:
+              * Call update_workflow_plan to mark tasks as "in_progress" when starting
+              * Call update_workflow_plan to mark tasks as "completed" when done
+              * Call update_workflow_plan to mark tasks as "failed" if errors occur
             """
                 ),
                 model="gpt-5-mini",
