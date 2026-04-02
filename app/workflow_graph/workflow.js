@@ -1,8 +1,9 @@
 export class WorkflowGraph {
-  constructor({ stage, edgesSvg, nodesHost, logEl }) {
+  constructor({ stage, edgesSvg, nodesHost, overlayEl, logEl }) {
     this.stage = stage;
     this.edgesSvg = edgesSvg;
     this.nodesHost = nodesHost;
+    this.overlayEl = overlayEl;
     this.logEl = logEl;
     this.edgesGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
     this.edgesSvg.appendChild(this.edgesGroup);
@@ -167,11 +168,13 @@ export class WorkflowGraph {
       }
     };
 
+    this.canvasState = { workflow: { nodes: [] }, plan: null, progress: null };
     this.data = { nodes: [] };
     this.byId = new Map();
     this.edges = [];          // {from,to}
     this.positions = new Map();// id -> {x,y}
     this.dragged = new Set();
+    this.expandedTodoIds = new Set();
     this.activeId = null;
     this.running = false;
 
@@ -286,9 +289,12 @@ export class WorkflowGraph {
 
     const contentW = maxX - minX;
     const contentH = maxY - minY;
-    const stageW = this.stage.clientWidth;
-    const stageH = this.stage.clientHeight;
-    const padding = 60 + this.EDGE_CURVE;
+    const viewportPadding = this._getViewportPadding();
+    const stageW = this.stage.clientWidth - viewportPadding.left - viewportPadding.right;
+    const stageH = this.stage.clientHeight - viewportPadding.top - viewportPadding.bottom;
+    const padding = this.EDGE_CURVE;
+
+    if (stageW <= 0 || stageH <= 0) return;
 
     // Calculate scale to fit
     const scaleX = (stageW - padding * 2) / contentW;
@@ -298,8 +304,8 @@ export class WorkflowGraph {
     // Center the content
     const scaledW = contentW * this.scale;
     const scaledH = contentH * this.scale;
-    this.panX = (stageW - scaledW) / 2 - minX * this.scale;
-    this.panY = (stageH - scaledH) / 2 - minY * this.scale;
+    this.panX = viewportPadding.left + (stageW - scaledW) / 2 - minX * this.scale;
+    this.panY = viewportPadding.top + (stageH - scaledH) / 2 - minY * this.scale;
 
     this._applyTransform();
   }
@@ -324,9 +330,15 @@ export class WorkflowGraph {
     if (this.logEl) this.logEl.textContent = "";
   }
 
-  setData(workflow) {
-    this.data = workflow && typeof workflow === "object" ? workflow : { nodes: [] };
+  setData(canvasState) {
+    this.canvasState = canvasState && typeof canvasState === "object"
+      ? canvasState
+      : { workflow: { nodes: [] }, plan: null, progress: null };
+    this.data = this.canvasState.workflow && typeof this.canvasState.workflow === "object"
+      ? this.canvasState.workflow
+      : { nodes: [] };
     this._validateAndBuildGraph();
+    this._renderOverlay();
   }
 
   _validateAndBuildGraph() {
@@ -427,8 +439,9 @@ export class WorkflowGraph {
     }
 
     const w = this.stage.clientWidth;
-    const topPad = 60;
-    const leftPad = 40;
+    const viewportPadding = this._getViewportPadding();
+    const topPad = viewportPadding.top;
+    const leftPad = viewportPadding.left;
 
     if (resetDragged) this.positions.clear();
 
@@ -473,8 +486,145 @@ export class WorkflowGraph {
   }
 
   render() {
+    this._renderOverlay();
     this._renderNodes();
     this._drawEdges();
+  }
+
+  _renderOverlay() {
+    if (!this.overlayEl) return;
+
+    const plan = this.canvasState.plan;
+    const progress = this.canvasState.progress;
+    if (!plan && !progress) {
+      this.overlayEl.className = "workflow-overlay is-hidden";
+      this.overlayEl.innerHTML = "";
+      return;
+    }
+
+    const workflowName = this.canvasState.workflow_name || "Workflow";
+    this.overlayEl.className = "workflow-overlay";
+    this.overlayEl.innerHTML = `
+      <div class="workflow-panel">
+        <div class="workflow-panel-header">
+          <span class="workflow-panel-kicker">Plan</span>
+          <span class="workflow-panel-chip">${escapeHtml(workflowName)}</span>
+        </div>
+        ${plan ? this._renderPlanMarkup(plan) : ""}
+        ${progress ? this._renderProgressMarkup(progress) : ""}
+      </div>
+    `;
+
+    this._bindOverlayInteractions();
+  }
+
+  _renderPlanMarkup(plan) {
+    const todos = Array.isArray(plan.todos) ? plan.todos : [];
+    const total = todos.length;
+    const completed = todos.filter((todo) => todo.status === "completed").length;
+    const percent = total ? Math.round((completed / total) * 100) : 0;
+    const maxVisible = Math.max(1, plan.max_visible_todos || 4);
+    const visibleTodos = todos.slice(0, maxVisible);
+    const remaining = Math.max(0, total - visibleTodos.length);
+
+    return `
+      <section class="workflow-card">
+        <header class="workflow-card-copy">
+          <h2>${escapeHtml(plan.title || "Workflow Plan")}</h2>
+          ${plan.description ? `<p>${escapeHtml(plan.description)}</p>` : ""}
+        </header>
+        <div class="workflow-card-surface">
+          <div class="workflow-plan-summary">
+            <div class="workflow-plan-count">${completed} of ${total} complete</div>
+            <div class="workflow-progress-bar" aria-hidden="true">
+              <span style="width:${percent}%"></span>
+            </div>
+          </div>
+          <div class="workflow-plan-list">
+            ${visibleTodos.map((todo) => this._renderTodoMarkup(todo)).join("")}
+            ${remaining > 0 ? `<div class="workflow-plan-more">... ${remaining} more</div>` : ""}
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  _renderTodoMarkup(todo) {
+    const status = todo.status || "pending";
+    const isExpanded = this.expandedTodoIds.has(todo.id);
+    const hasDescription = Boolean(todo.description);
+    const tagName = hasDescription ? "button" : "div";
+    const attrs = hasDescription
+      ? `type="button" class="workflow-todo-toggle" data-todo-id="${escapeHtml(todo.id)}" aria-expanded="${isExpanded ? "true" : "false"}"`
+      : `class="workflow-todo-static"`;
+    return `
+      <div class="workflow-todo workflow-todo-${status} ${isExpanded ? "is-expanded" : ""}">
+        <${tagName} ${attrs}>
+          <span class="workflow-todo-status"><span class="workflow-status-badge workflow-status-${status}"></span></span>
+          <span class="workflow-todo-body">
+            <span class="workflow-todo-label">${escapeHtml(todo.label || todo.id)}</span>
+            ${hasDescription && isExpanded ? `<span class="workflow-todo-description">${escapeHtml(todo.description)}</span>` : ""}
+          </span>
+          ${hasDescription ? `<span class="workflow-todo-chevron">${isExpanded ? "⌃" : "⌄"}</span>` : ""}
+        </${tagName}>
+      </div>
+    `;
+  }
+
+  _renderProgressMarkup(progress) {
+    const steps = Array.isArray(progress.steps) ? progress.steps : [];
+    return `
+      <section class="workflow-card workflow-card-compact">
+        <div class="workflow-progress-head">
+          <div>
+            <div class="workflow-progress-title">${escapeHtml(progress.title || "Execution Progress")}</div>
+            <div class="workflow-progress-caption">${steps.length} steps</div>
+          </div>
+          ${progress.elapsed_time_ms != null ? `<div class="workflow-progress-time">${formatElapsedTime(progress.elapsed_time_ms)}</div>` : ""}
+        </div>
+        <div class="workflow-progress-list">
+          ${steps.map((step) => `
+            <div class="workflow-progress-step workflow-progress-step-${escapeHtml(step.status || "pending")}">
+              <span class="workflow-status-badge workflow-status-${escapeHtml(step.status || "pending")}"></span>
+              <span class="workflow-progress-step-copy">
+                <span class="workflow-progress-step-label">${escapeHtml(step.label || step.id)}</span>
+                ${step.description ? `<span class="workflow-progress-step-description">${escapeHtml(step.description)}</span>` : ""}
+              </span>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  _bindOverlayInteractions() {
+    if (!this.overlayEl) return;
+
+    for (const toggle of this.overlayEl.querySelectorAll("[data-todo-id]")) {
+      toggle.addEventListener("click", () => {
+        const todoId = toggle.getAttribute("data-todo-id");
+        if (!todoId) return;
+        if (this.expandedTodoIds.has(todoId)) {
+          this.expandedTodoIds.delete(todoId);
+        } else {
+          this.expandedTodoIds.add(todoId);
+        }
+        this._renderOverlay();
+      });
+    }
+  }
+
+  _getViewportPadding() {
+    const padding = { top: 56, right: 56, bottom: 56, left: 40 };
+    if (!this.overlayEl || this.overlayEl.classList.contains("is-hidden")) {
+      return padding;
+    }
+
+    const overlayWidth = this.overlayEl.offsetWidth || 0;
+    if (overlayWidth > 0) {
+      padding.left = overlayWidth + 48;
+    }
+    return padding;
   }
 
   _renderNodes() {
@@ -675,4 +825,14 @@ function escapeHtml(s) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatElapsedTime(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
 }

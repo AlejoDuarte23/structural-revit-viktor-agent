@@ -17,6 +17,8 @@ from agents import set_tracing_disabled
 
 from app.aec import get_model_context
 from app.tools import get_tools, TOOL_DISPLAY_NAMES
+from app.workflow_graph.state import delete_canvas_state, load_canvas_state
+from app.workflow_graph.viewer import WorkflowViewer
 from app.viktor_tools.plotting_tool import PlotTool
 from app.viktor_tools.table_tool import TableTool
 
@@ -222,6 +224,9 @@ def workflow_agent_sync_stream(
 
                - create_dummy_workflow_node: Create individual nodes
                - compose_workflow_graph: Combine nodes into DAG visualization
+               - set_workflow_plan: Populate the plan card shown on the workflow graph canvas
+               - update_workflow_plan: Update plan items and statuses on the workflow graph
+               - set_workflow_progress: Show or clear the execution progress tracker below the plan
 
                Available node types for workflows:
                - get_autodesk_file_context: "Get ACC File Information"
@@ -465,10 +470,16 @@ class Controller(vkt.Controller):
         """Display the generated workflow graph."""
         # Clear storage when chat is reset
         if not params.chat:
+            delete_canvas_state()
             try:
                 vkt.Storage().delete("workflow_html", scope="entity")
             except Exception:
                 pass
+
+        canvas_state = load_canvas_state()
+        if canvas_state is not None:
+            viewer = WorkflowViewer(lambda: canvas_state)
+            return vkt.WebResult(html=viewer.write())
 
         try:
             stored_file = vkt.Storage().get("workflow_html", scope="entity")

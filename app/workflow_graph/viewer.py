@@ -33,8 +33,8 @@ class WorkflowViewer:
         js = (module_dir / "workflow.js").read_text(encoding="utf-8")
         js = js.replace("export class WorkflowGraph", "class WorkflowGraph")
 
-        workflow = self._workflow_factory()
-        workflow_json = json.dumps(self._model_dump(workflow), ensure_ascii=False)
+        canvas_state = self._workflow_factory()
+        state_json = json.dumps(self._model_dump(canvas_state), ensure_ascii=False)
 
         return f"""<!doctype html>
 <html lang="en">
@@ -49,6 +49,7 @@ class WorkflowViewer:
       <main id="stage">
         <svg id="edges"></svg>
         <div id="nodes"></div>
+        <aside id="workflow-overlay" class="workflow-overlay is-hidden"></aside>
         <div class="zoom-controls">
           <button id="zoom-in" title="Zoom In">+</button>
           <button id="zoom-out" title="Zoom Out">−</button>
@@ -59,20 +60,21 @@ class WorkflowViewer:
       </main>
     </div>
 
-    <script id="workflow-data" type="application/json">{workflow_json}</script>
+    <script id="workflow-data" type="application/json">{state_json}</script>
     <script>{js}</script>
     <script>
       const dataEl = document.getElementById("workflow-data");
-      const workflow = JSON.parse(dataEl.textContent || "{{}}");
+      const canvasState = JSON.parse(dataEl.textContent || "{{}}");
 
       const graph = new WorkflowGraph({{
         stage: document.getElementById("stage"),
         edgesSvg: document.getElementById("edges"),
         nodesHost: document.getElementById("nodes"),
+        overlayEl: document.getElementById("workflow-overlay"),
         logEl: null,
       }});
 
-      graph.setData(workflow);
+      graph.setData(canvasState);
       graph.relayout({{ resetDragged: true }});
       graph.render();
       
