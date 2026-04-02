@@ -511,12 +511,7 @@ export class WorkflowGraph {
 
     this.overlayEl.className = "workflow-overlay";
     this.overlayEl.innerHTML = `
-      <div class="workflow-panel">
-        <div class="workflow-panel-header">
-          <span class="workflow-panel-kicker">Plan</span>
-        </div>
-        ${plan ? this._renderPlanMarkup(plan) : ""}
-      </div>
+      ${plan ? this._renderPlanMarkup(plan) : ""}
     `;
 
     this._bindOverlayInteractions();
@@ -529,23 +524,17 @@ export class WorkflowGraph {
     const percent = total ? Math.round((completed / total) * 100) : 0;
 
     return `
-      <section class="workflow-card">
-        <header class="workflow-card-copy">
-          <h2>${escapeHtml(plan.title || "Workflow Plan")}</h2>
-          ${plan.description ? `<p>${escapeHtml(plan.description)}</p>` : ""}
-        </header>
-        <div class="workflow-card-surface">
-          <div class="workflow-plan-summary">
-            <div class="workflow-plan-count">${completed} of ${total} complete</div>
-            <div class="workflow-progress-bar" aria-hidden="true">
-              <span style="width:${percent}%"></span>
-            </div>
-          </div>
-          <div class="workflow-plan-list">
-            ${todos.map((todo) => this._renderTodoMarkup(todo)).join("")}
+      <div class="workflow-card-surface">
+        <div class="workflow-plan-summary">
+          <div class="workflow-plan-count">${escapeHtml(plan.title || "Workflow Plan")}</div>
+          <div class="workflow-progress-bar" aria-hidden="true">
+            <span style="width:${percent}%"></span>
           </div>
         </div>
-      </section>
+        <div class="workflow-plan-list">
+          ${todos.map((todo) => this._renderTodoMarkup(todo)).join("")}
+        </div>
+      </div>
     `;
   }
 

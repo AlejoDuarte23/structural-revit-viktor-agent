@@ -224,24 +224,30 @@ def workflow_agent_sync_stream(
 
                **CRITICAL: Always Track Task Progress**
                When a workflow plan exists, you MUST update task statuses as you work:
+               - **BEFORE updating any task**: ALWAYS call 'get_workflow_plan' first to see existing task IDs and statuses
                - Mark tasks as "in_progress" when you START executing them
                - Mark tasks as "completed" immediately when you FINISH them successfully
                - Mark tasks as "failed" if they encounter errors
-               - Use 'update_workflow_plan' after each task state change
+               - Use 'update_workflow_plan' with the EXACT task IDs from get_workflow_plan
 
                Tools available:
                - create_dummy_workflow_node: Create individual nodes
                - compose_workflow_graph: Combine nodes into DAG visualization
+               - get_workflow_plan: Get current plan with all task IDs and statuses (CALL THIS FIRST!)
                - set_workflow_plan: Populate the plan card shown on the workflow graph canvas
                - update_workflow_plan: Update plan items and statuses on the workflow graph
                - set_workflow_progress: Show or clear the execution progress tracker below the plan
 
                Example workflow with status updates:
-               1. Start task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "in_progress"}])
-               2. Execute: extract_analytical_model_json(...)
-               3. Complete task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "completed"}])
-               4. Start next task: update_workflow_plan(todos=[{"id": "build_sap_model", "status": "in_progress"}])
-               5. And so on...
+               1. Check plan: get_workflow_plan() → returns existing task IDs
+               2. Start task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "in_progress"}])
+               3. Execute: extract_analytical_model_json(...)
+               4. Complete task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "completed"}])
+               5. Check plan again: get_workflow_plan() → see updated statuses
+               6. Start next task: update_workflow_plan(todos=[{"id": "build_sap_model", "status": "in_progress"}])
+               7. And so on...
+
+               **IMPORTANT**: Never create new tasks when updating - always use existing task IDs from get_workflow_plan!
 
                Available node types for workflows:
                - get_autodesk_file_context: "Get ACC File Information"
@@ -269,9 +275,11 @@ def workflow_agent_sync_stream(
             - Run footing sizing before the ACC footing automation
             - Create workflow graphs to document process flow (optional)
             - **ALWAYS update plan task statuses** when a workflow plan is active:
-              * Call update_workflow_plan to mark tasks as "in_progress" when starting
-              * Call update_workflow_plan to mark tasks as "completed" when done
-              * Call update_workflow_plan to mark tasks as "failed" if errors occur
+              * Call get_workflow_plan FIRST to see existing task IDs and their current statuses
+              * Call update_workflow_plan to mark tasks as "in_progress" when starting (use exact IDs from get_workflow_plan)
+              * Call update_workflow_plan to mark tasks as "completed" when done (use exact IDs from get_workflow_plan)
+              * Call update_workflow_plan to mark tasks as "failed" if errors occur (use exact IDs from get_workflow_plan)
+              * NEVER create new tasks - always update existing ones using the IDs from get_workflow_plan
             """
                 ),
                 model="gpt-5-mini",

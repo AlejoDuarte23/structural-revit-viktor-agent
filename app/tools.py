@@ -42,6 +42,7 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "show_hide_table": "Show/Hide Table",
     "create_dummy_workflow_node": "Create Workflow Node",
     "compose_workflow_graph": "Compose Workflow Graph",
+    "get_workflow_plan": "Get Workflow Plan",
     "set_workflow_plan": "Set Workflow Plan",
     "update_workflow_plan": "Update Workflow Plan",
     "set_workflow_progress": "Set Workflow Progress",
@@ -318,6 +319,10 @@ class UpdateWorkflowPlanTodoInput(BaseModel):
     )
 
 
+class GetWorkflowPlanArgs(BaseModel):
+    pass
+
+
 class UpdateWorkflowPlanArgs(BaseModel):
     title: str | None = Field(default=None, description="Optional replacement plan title")
     description: str | None = Field(
@@ -379,6 +384,35 @@ def _require_canvas_state():
             "No workflow graph is available yet. Run 'compose_workflow_graph' first."
         )
     return state
+
+
+async def get_workflow_plan_func(_ctx: Any, args: str) -> str:
+    state = _require_canvas_state()
+    if state.plan is None:
+        return (
+            "No workflow plan exists yet. Run 'set_workflow_plan' after creating the workflow "
+            "with 'compose_workflow_graph' first."
+        )
+
+    import json
+    plan_data = {
+        "title": state.plan.title,
+        "description": state.plan.description,
+        "workflow_name": state.workflow_name,
+        "todos": [
+            {
+                "id": todo.id,
+                "label": todo.label,
+                "status": todo.status,
+                "description": todo.description,
+            }
+            for todo in state.plan.todos
+        ],
+    }
+    return (
+        f"Current workflow plan for '{state.workflow_name}':\n"
+        f"{json.dumps(plan_data, indent=2)}"
+    )
 
 
 async def set_workflow_plan_func(_ctx: Any, args: str) -> str:
@@ -499,6 +533,21 @@ async def set_workflow_progress_func(_ctx: Any, args: str) -> str:
     )
 
 
+def get_workflow_plan_tool() -> Any:
+    from agents import FunctionTool
+
+    return FunctionTool(
+        name="get_workflow_plan",
+        description=(
+            "Get the current workflow plan with all todo items and their statuses. "
+            "ALWAYS call this before updating the plan to see existing task IDs and statuses. "
+            "This prevents creating duplicate tasks."
+        ),
+        params_json_schema=GetWorkflowPlanArgs.model_json_schema(),
+        on_invoke_tool=get_workflow_plan_func,
+    )
+
+
 def set_workflow_plan_tool() -> Any:
     from agents import FunctionTool
 
@@ -545,6 +594,7 @@ def get_tools() -> list[Any]:
     return [
         create_dummy_workflow_node_tool(),
         compose_workflow_graph_tool(),
+        get_workflow_plan_tool(),
         set_workflow_plan_tool(),
         update_workflow_plan_tool(),
         set_workflow_progress_tool(),
