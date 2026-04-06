@@ -11,7 +11,7 @@ from typing import Any
 from collections.abc import Callable
 
 import viktor as vkt
-from agents import Agent, Runner
+from agents import Agent, ItemHelpers, Runner
 from openai.types.responses import ResponseTextDeltaEvent
 from agents import set_tracing_disabled
 
@@ -158,9 +158,9 @@ def workflow_agent_sync_stream(
                - When the user wants an ACC job followed through to completion in the same run,
                  use an agentic polling loop
                - After submitting the job, send a short assistant progress message before each poll
-                 such as "I'm polling the ACC job status now."
+                 prefixed with "Progress:" such as "Progress: I'm polling the ACC job status now."
                - Then call the matching poll tool with its default wait so checks happen about every 15 seconds
-               - If the poll tool says the job is still running, send another short progress message and poll again
+               - If the poll tool says the job is still running, send another short "Progress:" message and poll again
                - Stop only when the poll tool returns a terminal status
                - Only continue to downstream tools after the required ACC finalization and storage step is complete
 
@@ -337,6 +337,15 @@ def workflow_agent_sync_stream(
                 if event.type == "run_item_stream_event":
                     item = event.item
                     raw = getattr(item, "raw_item", None)
+
+                    if (
+                        event.name == "message_output_created"
+                        and getattr(item, "type", None) == "message_output_item"
+                    ):
+                        text = ItemHelpers.text_message_output(item).strip()
+                        if text.startswith("Progress:"):
+                            q.put(f"\n\n{text}\n\n")
+                        continue
 
                     if event.name == "tool_called":
                         cid = _extract_call_id(raw)
