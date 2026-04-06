@@ -3,6 +3,10 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, Json
 
+import viktor as vkt
+
+from app.workflow_graph.models import PlanTodo, ProgressStep, WorkflowPlan, WorkflowProgress
+from app.workflow_graph.state import build_canvas_state, load_canvas_state, save_canvas_state
 from app.viktor_tools.footing_sizing_tool import calculate_footing_sizing_tool
 from app.viktor_tools.analytical_model_json_tool import (
     extract_analytical_model_json_tool,
@@ -38,6 +42,10 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "show_hide_table": "Show/Hide Table",
     "create_dummy_workflow_node": "Create Workflow Node",
     "compose_workflow_graph": "Compose Workflow Graph",
+    "get_workflow_plan": "Get Workflow Plan",
+    "set_workflow_plan": "Set Workflow Plan",
+    "update_workflow_plan": "Update Workflow Plan",
+    "set_workflow_progress": "Set Workflow Progress",
     "build_sap_model_from_analytical_json": "Create SAP Model",
     "display_support_coordinates_table": "Display Coordinate Table",
     "display_reaction_loads_table": "Display Reaction Loads",
@@ -227,13 +235,12 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
         ]
     )
 
-    viewer = WorkflowViewer(lambda: workflow)
+    canvas_state = build_canvas_state(payload.workflow_name, workflow)
+    viewer = WorkflowViewer(lambda: canvas_state)
     html_content = viewer.write()  # Returns HTML string
 
-    # Store HTML in VIKTOR storage for WebView access
     try:
-        import viktor as vkt
-
+        save_canvas_state(canvas_state)
         data_json = json.dumps(
             {
                 "html": html_content,
@@ -246,10 +253,13 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
             scope="entity",
         )
     except Exception:
-        # Ignore if not running in VIKTOR context
         pass
 
-    return f"Workflow '{payload.workflow_name}' created successfully with {len(payload.nodes)} nodes and {len(edges)} connections. The workflow graph has been updated and is now visible in the Workflow Graph view on the right side."
+    return (
+        f"Workflow '{payload.workflow_name}' created successfully with "
+        f"{len(payload.nodes)} nodes and {len(edges)} connections. "
+        "The workflow graph has been updated and a plan panel now appears in the top-left of the canvas."
+    )
 
 
 def compose_workflow_graph_tool() -> Any:
@@ -263,10 +273,331 @@ def compose_workflow_graph_tool() -> Any:
     )
 
 
+class WorkflowPlanTodoInput(BaseModel):
+    id: str = Field(..., description="Stable todo id for this plan item")
+    label: str = Field(..., description="Short todo label shown in the plan")
+    status: Literal["pending", "in_progress", "completed", "cancelled"] = Field(
+        default="pending",
+        description="Current status for this todo item",
+    )
+    description: str | None = Field(
+        default=None,
+        description="Optional detail shown when the todo row is expanded",
+    )
+
+
+class SetWorkflowPlanArgs(BaseModel):
+    title: str = Field(..., description="Plan title shown in the overlay card")
+    description: str | None = Field(
+        default=None,
+        description="Optional plan description below the title",
+    )
+    todos: list[WorkflowPlanTodoInput] = Field(
+        ...,
+        description="Ordered todo items for the workflow plan",
+    )
+    max_visible_todos: int = Field(
+        default=4,
+        ge=1,
+        description="Maximum number of todos shown before the overlay collapses into a '+ more' row",
+    )
+
+
+class UpdateWorkflowPlanTodoInput(BaseModel):
+    id: str = Field(..., description="Existing todo id to update")
+    label: str | None = Field(
+        default=None,
+        description="Optional replacement label for the todo",
+    )
+    status: Literal["pending", "in_progress", "completed", "cancelled"] | None = Field(
+        default=None,
+        description="Optional replacement status for the todo",
+    )
+    description: str | None = Field(
+        default=None,
+        description="Optional replacement description for the todo",
+    )
+
+
+class GetWorkflowPlanArgs(BaseModel):
+    pass
+
+
+class UpdateWorkflowPlanArgs(BaseModel):
+    title: str | None = Field(default=None, description="Optional replacement plan title")
+    description: str | None = Field(
+        default=None,
+        description="Optional replacement plan description",
+    )
+    max_visible_todos: int | None = Field(
+        default=None,
+        ge=1,
+        description="Optional replacement max visible todo count",
+    )
+    todos: list[UpdateWorkflowPlanTodoInput] = Field(
+        default_factory=list,
+        description="Todo updates matched by id",
+    )
+    append_missing: bool = Field(
+        default=False,
+        description="Append unknown todo ids instead of failing. Added todos require a label.",
+    )
+
+
+class WorkflowProgressStepInput(BaseModel):
+    id: str = Field(..., description="Stable progress step id")
+    label: str = Field(..., description="Short progress step label")
+    description: str | None = Field(
+        default=None,
+        description="Optional detail text for this progress step",
+    )
+    status: Literal["pending", "in_progress", "completed", "failed"] = Field(
+        default="pending",
+        description="Current execution status for this step",
+    )
+
+
+class SetWorkflowProgressArgs(BaseModel):
+    title: str = Field(
+        default="Execution Progress",
+        description="Progress section title shown below the plan",
+    )
+    steps: list[WorkflowProgressStepInput] = Field(
+        default_factory=list,
+        description="Ordered execution steps for the progress tracker",
+    )
+    elapsed_time_ms: int | None = Field(
+        default=None,
+        ge=0,
+        description="Optional elapsed time in milliseconds",
+    )
+    clear: bool = Field(
+        default=False,
+        description="Clear the progress tracker instead of replacing it",
+    )
+
+
+def _require_canvas_state():
+    state = load_canvas_state()
+    if state is None:
+        raise ValueError(
+            "No workflow graph is available yet. Run 'compose_workflow_graph' first."
+        )
+    return state
+
+
+async def get_workflow_plan_func(_ctx: Any, args: str) -> str:
+    state = _require_canvas_state()
+    if state.plan is None:
+        return (
+            "No workflow plan exists yet. Run 'set_workflow_plan' after creating the workflow "
+            "with 'compose_workflow_graph' first."
+        )
+
+    import json
+    plan_data = {
+        "title": state.plan.title,
+        "description": state.plan.description,
+        "workflow_name": state.workflow_name,
+        "todos": [
+            {
+                "id": todo.id,
+                "label": todo.label,
+                "status": todo.status,
+                "description": todo.description,
+            }
+            for todo in state.plan.todos
+        ],
+    }
+    return (
+        f"Current workflow plan for '{state.workflow_name}':\n"
+        f"{json.dumps(plan_data, indent=2)}"
+    )
+
+
+async def set_workflow_plan_func(_ctx: Any, args: str) -> str:
+    payload = SetWorkflowPlanArgs.model_validate_json(args)
+    state = _require_canvas_state()
+    state.plan = WorkflowPlan(
+        id=state.plan.id if state.plan else "workflow-plan",
+        title=payload.title,
+        description=payload.description,
+        todos=[
+            PlanTodo(
+                id=todo.id,
+                label=todo.label,
+                status=todo.status,
+                description=todo.description,
+            )
+            for todo in payload.todos
+        ],
+        max_visible_todos=payload.max_visible_todos,
+    )
+    save_canvas_state(state)
+    return (
+        f"Workflow plan updated with {len(payload.todos)} todo items for "
+        f"'{state.workflow_name}'."
+    )
+
+
+async def update_workflow_plan_func(_ctx: Any, args: str) -> str:
+    payload = UpdateWorkflowPlanArgs.model_validate_json(args)
+    state = _require_canvas_state()
+    if state.plan is None:
+        raise ValueError(
+            "No workflow plan exists yet. Run 'set_workflow_plan' after creating the workflow."
+        )
+
+    todos_by_id = {todo.id: todo for todo in state.plan.todos}
+    missing_ids: list[str] = []
+    appended = 0
+    updated = 0
+
+    for todo_update in payload.todos:
+        todo = todos_by_id.get(todo_update.id)
+        if todo is None:
+            if not payload.append_missing:
+                missing_ids.append(todo_update.id)
+                continue
+            if not todo_update.label:
+                raise ValueError(
+                    f"Todo '{todo_update.id}' does not exist and needs a label to be appended."
+                )
+            todo = PlanTodo(
+                id=todo_update.id,
+                label=todo_update.label,
+                status=todo_update.status or "pending",
+                description=todo_update.description,
+            )
+            state.plan.todos.append(todo)
+            todos_by_id[todo.id] = todo
+            appended += 1
+            continue
+
+        if todo_update.label is not None:
+            todo.label = todo_update.label
+        if todo_update.status is not None:
+            todo.status = todo_update.status
+        if todo_update.description is not None:
+            todo.description = todo_update.description
+        updated += 1
+
+    if missing_ids:
+        raise ValueError(
+            "Unknown todo id(s): "
+            + ", ".join(missing_ids)
+            + ". Pass append_missing=true to add them."
+        )
+
+    if payload.title is not None:
+        state.plan.title = payload.title
+    if payload.description is not None:
+        state.plan.description = payload.description
+    if payload.max_visible_todos is not None:
+        state.plan.max_visible_todos = payload.max_visible_todos
+
+    save_canvas_state(state)
+    return (
+        f"Workflow plan updated for '{state.workflow_name}' "
+        f"({updated} modified, {appended} appended)."
+    )
+
+
+async def set_workflow_progress_func(_ctx: Any, args: str) -> str:
+    payload = SetWorkflowProgressArgs.model_validate_json(args)
+    state = _require_canvas_state()
+
+    if payload.clear:
+        state.progress = None
+        save_canvas_state(state)
+        return f"Workflow progress cleared for '{state.workflow_name}'."
+
+    state.progress = WorkflowProgress(
+        id=state.progress.id if state.progress else "workflow-progress",
+        title=payload.title,
+        steps=[
+            ProgressStep(
+                id=step.id,
+                label=step.label,
+                description=step.description,
+                status=step.status,
+            )
+            for step in payload.steps
+        ],
+        elapsed_time_ms=payload.elapsed_time_ms,
+    )
+    save_canvas_state(state)
+    return (
+        f"Workflow progress updated with {len(payload.steps)} steps for "
+        f"'{state.workflow_name}'."
+    )
+
+
+def get_workflow_plan_tool() -> Any:
+    from agents import FunctionTool
+
+    return FunctionTool(
+        name="get_workflow_plan",
+        description=(
+            "Get the current workflow plan with all todo items and their statuses. "
+            "ALWAYS call this before updating the plan to see existing task IDs and statuses. "
+            "This prevents creating duplicate tasks."
+        ),
+        params_json_schema=GetWorkflowPlanArgs.model_json_schema(),
+        on_invoke_tool=get_workflow_plan_func,
+    )
+
+
+def set_workflow_plan_tool() -> Any:
+    from agents import FunctionTool
+
+    return FunctionTool(
+        name="set_workflow_plan",
+        description=(
+            "Populate or replace the plan card shown in the top-left of the current workflow graph. "
+            "Use this after 'compose_workflow_graph' when you want a curated implementation or execution plan."
+        ),
+        params_json_schema=SetWorkflowPlanArgs.model_json_schema(),
+        on_invoke_tool=set_workflow_plan_func,
+    )
+
+
+def update_workflow_plan_tool() -> Any:
+    from agents import FunctionTool
+
+    return FunctionTool(
+        name="update_workflow_plan",
+        description=(
+            "Update todo labels, descriptions, and statuses in the current workflow plan overlay. "
+            "Use stable todo ids created by 'set_workflow_plan' or the default ids derived from workflow nodes."
+        ),
+        params_json_schema=UpdateWorkflowPlanArgs.model_json_schema(),
+        on_invoke_tool=update_workflow_plan_func,
+    )
+
+
+def set_workflow_progress_tool() -> Any:
+    from agents import FunctionTool
+
+    return FunctionTool(
+        name="set_workflow_progress",
+        description=(
+            "Show, replace, or clear the execution progress tracker shown under the workflow plan card. "
+            "Pass clear=true to remove the progress section."
+        ),
+        params_json_schema=SetWorkflowProgressArgs.model_json_schema(),
+        on_invoke_tool=set_workflow_progress_func,
+    )
+
+
 def get_tools() -> list[Any]:
     return [
         create_dummy_workflow_node_tool(),
         compose_workflow_graph_tool(),
+        get_workflow_plan_tool(),
+        set_workflow_plan_tool(),
+        update_workflow_plan_tool(),
+        set_workflow_progress_tool(),
         build_sap_model_from_analytical_json_tool(),
         display_support_coordinates_table_tool(),
         display_reaction_loads_table_tool(),

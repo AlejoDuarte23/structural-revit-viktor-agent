@@ -17,6 +17,8 @@ from agents import set_tracing_disabled
 
 from app.aec import get_model_context
 from app.tools import get_tools, TOOL_DISPLAY_NAMES
+from app.workflow_graph.state import delete_canvas_state, load_canvas_state
+from app.workflow_graph.viewer import WorkflowViewer
 from app.viktor_tools.plotting_tool import PlotTool
 from app.viktor_tools.table_tool import TableTool
 
@@ -218,10 +220,34 @@ def workflow_agent_sync_stream(
                - show_hide_autodesk_view: Control Autodesk Viewer panel visibility
 
             6. WORKFLOW GRAPHS (Optional)
-               Create visual workflow diagrams to document engineering processes:
+               Create visual workflow diagrams to document engineering processes.
 
+               **CRITICAL: Always Track Task Progress**
+               When a workflow plan exists, you MUST update task statuses as you work:
+               - **BEFORE updating any task**: ALWAYS call 'get_workflow_plan' first to see existing task IDs and statuses
+               - Mark tasks as "in_progress" when you START executing them
+               - Mark tasks as "completed" immediately when you FINISH them successfully
+               - Mark tasks as "failed" if they encounter errors
+               - Use 'update_workflow_plan' with the EXACT task IDs from get_workflow_plan
+
+               Tools available:
                - create_dummy_workflow_node: Create individual nodes
                - compose_workflow_graph: Combine nodes into DAG visualization
+               - get_workflow_plan: Get current plan with all task IDs and statuses (CALL THIS FIRST!)
+               - set_workflow_plan: Populate the plan card shown on the workflow graph canvas
+               - update_workflow_plan: Update plan items and statuses on the workflow graph
+               - set_workflow_progress: Show or clear the execution progress tracker below the plan
+
+               Example workflow with status updates:
+               1. Check plan: get_workflow_plan() → returns existing task IDs
+               2. Start task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "in_progress"}])
+               3. Execute: extract_analytical_model_json(...)
+               4. Complete task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "completed"}])
+               5. Check plan again: get_workflow_plan() → see updated statuses
+               6. Start next task: update_workflow_plan(todos=[{"id": "build_sap_model", "status": "in_progress"}])
+               7. And so on...
+
+               **IMPORTANT**: Never create new tasks when updating - always use existing task IDs from get_workflow_plan!
 
                Available node types for workflows:
                - get_autodesk_file_context: "Get ACC File Information"
@@ -248,6 +274,12 @@ def workflow_agent_sync_stream(
             - Display support coordinates when the user wants a quick verification table
             - Run footing sizing before the ACC footing automation
             - Create workflow graphs to document process flow (optional)
+            - **ALWAYS update plan task statuses** when a workflow plan is active:
+              * Call get_workflow_plan FIRST to see existing task IDs and their current statuses
+              * Call update_workflow_plan to mark tasks as "in_progress" when starting (use exact IDs from get_workflow_plan)
+              * Call update_workflow_plan to mark tasks as "completed" when done (use exact IDs from get_workflow_plan)
+              * Call update_workflow_plan to mark tasks as "failed" if errors occur (use exact IDs from get_workflow_plan)
+              * NEVER create new tasks - always update existing ones using the IDs from get_workflow_plan
             """
                 ),
                 model="gpt-5-mini",
@@ -465,10 +497,16 @@ class Controller(vkt.Controller):
         """Display the generated workflow graph."""
         # Clear storage when chat is reset
         if not params.chat:
+            delete_canvas_state()
             try:
                 vkt.Storage().delete("workflow_html", scope="entity")
             except Exception:
                 pass
+
+        canvas_state = load_canvas_state()
+        if canvas_state is not None:
+            viewer = WorkflowViewer(lambda: canvas_state)
+            return vkt.WebResult(html=viewer.write())
 
         try:
             stored_file = vkt.Storage().get("workflow_html", scope="entity")
