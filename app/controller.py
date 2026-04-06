@@ -157,6 +157,9 @@ def workflow_agent_sync_stream(
                - The Agents SDK has a built-in agent loop that can keep calling tools until the task is complete
                - When the user wants an ACC job followed through to completion in the same run,
                  use an agentic polling loop
+               - You MUST emit a separate assistant message item before EVERY poll tool call
+               - The message MUST be plain assistant text and MUST start with "Progress:"
+               - Do not call a poll tool silently and do not chain poll tool calls back-to-back without that message
                - After submitting the job, send a short assistant progress message before each poll
                  prefixed with "Progress:" such as "Progress: I'm polling the ACC job status now."
                - Then call the matching poll tool with its default wait so checks happen about every 15 seconds

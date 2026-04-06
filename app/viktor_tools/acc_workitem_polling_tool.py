@@ -238,7 +238,9 @@ def poll_analytical_model_acc_job_tool() -> Any:
         description=(
             "Wait about 15 seconds by default, then check the latest submitted ACC analytical model work item once. "
             "If it finished successfully, finalize the ACC output file, download the JSON, "
-            "and store it in Viktor Storage. Designed for agentic polling loops."
+            "and store it in Viktor Storage. Designed for agentic polling loops. "
+            "Before calling this tool in a loop, the agent should first emit a short user-facing "
+            "assistant message starting with 'Progress:'."
         ),
         params_json_schema=PollAnalyticalModelAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_analytical_model_acc_job_func,
@@ -253,7 +255,8 @@ def poll_footing_acc_job_tool() -> Any:
         description=(
             "Wait about 15 seconds by default, then check the latest submitted ACC footing work item once. "
             "If it finished successfully, finalize the ACC output file in ACC. "
-            "Designed for agentic polling loops."
+            "Designed for agentic polling loops. Before calling this tool in a loop, the agent should "
+            "first emit a short user-facing assistant message starting with 'Progress:'."
         ),
         params_json_schema=PollFootingAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_footing_acc_job_func,
