@@ -153,6 +153,17 @@ def workflow_agent_sync_stream(
                    and stores it in Viktor Storage with key 'acc_analytical_model_json'
                  * If the work item is still running, returns the current status and report URL
 
+               LONG-RUNNING ACC JOBS:
+               - The Agents SDK has a built-in agent loop that can keep calling tools until the task is complete
+               - When the user wants an ACC job followed through to completion in the same run,
+                 use an agentic polling loop
+               - After submitting the job, send a short assistant progress message before each poll
+                 such as "I'm polling the ACC job status now."
+               - Then call the matching poll tool with its default wait so checks happen about every 15 seconds
+               - If the poll tool says the job is still running, send another short progress message and poll again
+               - Stop only when the poll tool returns a terminal status
+               - Only continue to downstream tools after the required ACC finalization and storage step is complete
+
             2. SAP2000 WORKER FLOW
                Build and run the SAP2000 model from the exported analytical JSON:
 
@@ -288,6 +299,7 @@ def workflow_agent_sync_stream(
             - Export analytical data before building the SAP2000 model
             - Display support coordinates when the user wants a quick verification table
             - Run footing sizing before the ACC footing automation
+            - For long-running ACC jobs, use short assistant progress messages plus repeated poll tool calls until completion
             - Create workflow graphs to document process flow (optional)
             - **ALWAYS update plan task statuses** when a workflow plan is active:
               * Call get_workflow_plan FIRST to see existing task IDs and their current statuses
@@ -306,7 +318,7 @@ def workflow_agent_sync_stream(
                 agent,
                 input=chat_history,
                 context=AgentContext(autodesk_file=autodesk_file),
-                max_turns=20,
+                max_turns=100,
             )
 
             async for event in result.stream_events():

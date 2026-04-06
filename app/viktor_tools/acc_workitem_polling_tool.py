@@ -4,9 +4,10 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import time
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +34,31 @@ class PendingAccJob(BaseModel):
 
 
 class PollAnalyticalModelAccJobArgs(BaseModel):
-    """No user input is required."""
+    """Polling configuration for the analytical ACC job."""
+
+    wait_seconds: int = Field(
+        default=15,
+        ge=0,
+        le=60,
+        description=(
+            "Seconds to wait before checking the work item status once. "
+            "Use the default 15 seconds for agentic polling loops."
+        ),
+    )
 
 
 class PollFootingAccJobArgs(BaseModel):
-    """No user input is required."""
+    """Polling configuration for the footing ACC job."""
+
+    wait_seconds: int = Field(
+        default=15,
+        ge=0,
+        le=60,
+        description=(
+            "Seconds to wait before checking the work item status once. "
+            "Use the default 15 seconds for agentic polling loops."
+        ),
+    )
 
 
 def save_pending_job(vkt: Any, storage_key: str, job: PendingAccJob) -> None:
@@ -123,13 +144,16 @@ def _finalize_output_item(
     return job
 
 
-def _poll_pending_job_once(vkt: Any, storage_key: str) -> str:
+def _poll_pending_job_once(vkt: Any, storage_key: str, *, wait_seconds: int) -> str:
     from aps_automation_sdk.core import get_workitem_status
 
     from app.aec import APS_AUTOMATION_OAUTH_INTEGRATION, get_token
 
     job = load_pending_job(vkt, storage_key)
     token3lo = get_token(APS_AUTOMATION_OAUTH_INTEGRATION)
+
+    if wait_seconds:
+        time.sleep(wait_seconds)
 
     status_payload = get_workitem_status(job.workitem_id, token3lo)
     job.status = status_payload.get("status", "unknown")
@@ -169,7 +193,7 @@ def _poll_pending_job_once(vkt: Any, storage_key: str) -> str:
 
 
 async def poll_analytical_model_acc_job_func(_ctx: Any, args: str) -> str:
-    PollAnalyticalModelAccJobArgs.model_validate_json(args or "{}")
+    payload = PollAnalyticalModelAccJobArgs.model_validate_json(args or "{}")
 
     try:
         import viktor as vkt
@@ -177,14 +201,18 @@ async def poll_analytical_model_acc_job_func(_ctx: Any, args: str) -> str:
         return f"Error importing required modules: {e}."
 
     try:
-        return _poll_pending_job_once(vkt, ANALYTICAL_JOB_STORAGE_KEY)
+        return _poll_pending_job_once(
+            vkt,
+            ANALYTICAL_JOB_STORAGE_KEY,
+            wait_seconds=payload.wait_seconds,
+        )
     except Exception as e:
         logger.exception("Unexpected error in poll_analytical_model_acc_job_func")
         return f"Error polling analytical ACC job: {type(e).__name__}: {e}"
 
 
 async def poll_footing_acc_job_func(_ctx: Any, args: str) -> str:
-    PollFootingAccJobArgs.model_validate_json(args or "{}")
+    payload = PollFootingAccJobArgs.model_validate_json(args or "{}")
 
     try:
         import viktor as vkt
@@ -192,7 +220,11 @@ async def poll_footing_acc_job_func(_ctx: Any, args: str) -> str:
         return f"Error importing required modules: {e}."
 
     try:
-        return _poll_pending_job_once(vkt, FOOTING_JOB_STORAGE_KEY)
+        return _poll_pending_job_once(
+            vkt,
+            FOOTING_JOB_STORAGE_KEY,
+            wait_seconds=payload.wait_seconds,
+        )
     except Exception as e:
         logger.exception("Unexpected error in poll_footing_acc_job_func")
         return f"Error polling footing ACC job: {type(e).__name__}: {e}"
@@ -204,9 +236,9 @@ def poll_analytical_model_acc_job_tool() -> Any:
     return FunctionTool(
         name="poll_analytical_model_acc_job",
         description=(
-            "Check the latest submitted ACC analytical model work item once. "
+            "Wait about 15 seconds by default, then check the latest submitted ACC analytical model work item once. "
             "If it finished successfully, finalize the ACC output file, download the JSON, "
-            "and store it in Viktor Storage."
+            "and store it in Viktor Storage. Designed for agentic polling loops."
         ),
         params_json_schema=PollAnalyticalModelAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_analytical_model_acc_job_func,
@@ -219,8 +251,9 @@ def poll_footing_acc_job_tool() -> Any:
     return FunctionTool(
         name="poll_footing_acc_job",
         description=(
-            "Check the latest submitted ACC footing work item once. "
-            "If it finished successfully, finalize the ACC output file in ACC."
+            "Wait about 15 seconds by default, then check the latest submitted ACC footing work item once. "
+            "If it finished successfully, finalize the ACC output file in ACC. "
+            "Designed for agentic polling loops."
         ),
         params_json_schema=PollFootingAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_footing_acc_job_func,
