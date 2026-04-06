@@ -402,12 +402,37 @@ def _require_canvas_state():
     return state
 
 
+def _missing_workflow_plan_response(*, reason: str) -> str:
+    import json
+
+    response = {
+        "status": "missing_prerequisite",
+        "reason": reason,
+        "next_steps": [
+            "compose_workflow_graph",
+            "set_workflow_plan",
+        ],
+    }
+    return json.dumps(response, indent=2)
+
+
 async def get_workflow_plan_func(_ctx: Any, args: str) -> str:
-    state = _require_canvas_state()
+    GetWorkflowPlanArgs.model_validate_json(args or "{}")
+    state = load_canvas_state()
+    if state is None:
+        return _missing_workflow_plan_response(
+            reason=(
+                "No workflow graph is available yet. Create one with "
+                "'compose_workflow_graph' before requesting the workflow plan."
+            )
+        )
+
     if state.plan is None:
-        return (
-            "No workflow plan exists yet. Run 'set_workflow_plan' after creating the workflow "
-            "with 'compose_workflow_graph' first."
+        return _missing_workflow_plan_response(
+            reason=(
+                f"Workflow graph '{state.workflow_name}' exists but no workflow plan has been set yet. "
+                "Run 'set_workflow_plan' before trying to update plan tasks."
+            )
         )
 
     import json
@@ -557,7 +582,9 @@ def get_workflow_plan_tool() -> Any:
         description=(
             "Get the current workflow plan with all todo items and their statuses. "
             "ALWAYS call this before updating the plan to see existing task IDs and statuses. "
-            "This prevents creating duplicate tasks."
+            "This prevents creating duplicate tasks. If no workflow graph or plan exists yet, "
+            "the tool returns a non-fatal prerequisite response telling you to run "
+            "'compose_workflow_graph' and/or 'set_workflow_plan'."
         ),
         params_json_schema=GetWorkflowPlanArgs.model_json_schema(),
         on_invoke_tool=get_workflow_plan_func,

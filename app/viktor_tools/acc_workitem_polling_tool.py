@@ -42,12 +42,12 @@ class PollAnalyticalModelAccJobArgs(BaseModel):
     """Polling configuration for the analytical ACC job."""
 
     wait_seconds: int = Field(
-        default=15,
+        default=10,
         ge=0,
         le=60,
         description=(
             "Seconds to wait before checking the work item status once. "
-            "Use the default 15 seconds for agentic polling loops."
+            "Use the default 10 seconds for agentic polling loops."
         ),
     )
 
@@ -56,12 +56,12 @@ class PollFootingAccJobArgs(BaseModel):
     """Polling configuration for the footing ACC job."""
 
     wait_seconds: int = Field(
-        default=15,
+        default=10,
         ge=0,
         le=60,
         description=(
             "Seconds to wait before checking the work item status once. "
-            "Use the default 15 seconds for agentic polling loops."
+            "Use the default 10 seconds for agentic polling loops."
         ),
     )
 
@@ -70,12 +70,12 @@ class PollPileAccJobArgs(BaseModel):
     """Polling configuration for the pile ACC job."""
 
     wait_seconds: int = Field(
-        default=15,
+        default=10,
         ge=0,
         le=60,
         description=(
             "Seconds to wait before checking the work item status once. "
-            "Use the default 15 seconds for agentic polling loops."
+            "Use the default 10 seconds for agentic polling loops."
         ),
     )
 
@@ -291,11 +291,11 @@ def poll_analytical_model_acc_job_tool() -> Any:
     return FunctionTool(
         name="poll_analytical_model_acc_job",
         description=(
-            "Wait about 15 seconds by default, then check the latest submitted ACC analytical model work item once. "
+            "Wait about 10 seconds by default, then check the latest submitted ACC analytical model work item once. "
             "If it finished successfully, finalize the ACC output file, download the JSON, "
             "and store it in Viktor Storage. Designed for agentic polling loops. "
-            "Before calling this tool in a loop, the agent should first emit a short user-facing "
-            "assistant message starting with 'Progress:'."
+            "Before calling this tool in a loop, the agent should first emit a short natural "
+            "user-facing assistant status message."
         ),
         params_json_schema=PollAnalyticalModelAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_analytical_model_acc_job_func,
@@ -308,10 +308,10 @@ def poll_footing_acc_job_tool() -> Any:
     return FunctionTool(
         name="poll_footing_acc_job",
         description=(
-            "Wait about 15 seconds by default, then check the latest submitted ACC footing work item once. "
+            "Wait about 10 seconds by default, then check the latest submitted ACC footing work item once. "
             "If it finished successfully, finalize the ACC output file in ACC. "
             "Designed for agentic polling loops. Before calling this tool in a loop, the agent should "
-            "first emit a short user-facing assistant message starting with 'Progress:'."
+            "first emit a short natural user-facing assistant status message."
         ),
         params_json_schema=PollFootingAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_footing_acc_job_func,
@@ -324,10 +324,10 @@ def poll_pile_acc_job_tool() -> Any:
     return FunctionTool(
         name="poll_pile_acc_job",
         description=(
-            "Wait about 15 seconds by default, then check the latest submitted ACC pile work item once. "
+            "Wait about 10 seconds by default, then check the latest submitted ACC pile work item once. "
             "If it finished successfully, finalize the ACC output file in ACC. "
             "Designed for agentic polling loops. Before calling this tool in a loop, the agent should "
-            "first emit a short user-facing assistant message starting with 'Progress:'."
+            "first emit a short natural user-facing assistant status message."
         ),
         params_json_schema=PollPileAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_pile_acc_job_func,
