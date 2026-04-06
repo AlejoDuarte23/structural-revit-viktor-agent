@@ -232,8 +232,24 @@ def workflow_agent_sync_stream(
                  * Does not download the result locally or store it in Viktor Storage
                  * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
 
+               - run_pile_acc_automation: Submit the ACC pile model automation
+                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Reads pile data from Viktor Storage key 'pile_axial_capacity_results'
+                 * Adds familyName, typeName, and units required by the add-in payload
+                 * Uploads the payload as 'pile_foundations.json'
+                 * Submits the job and stores the pending ACC job metadata, including the output storage id
+                 * Returns a work item id for later polling
+                 * Does not download the result locally or store it in Viktor Storage
+                 * Requires APS_ACTIVITY_PILE_FULL_ALIAS or APS_ACTIVITY_PILE_FOUNDATION_FULL_ALIAS,
+                   and APS_ACTIVITY_PILE_SIGNATURE or APS_ACTIVITY_PILE_FOUNDATION_SIGNATURE
+
                - poll_footing_acc_job: Check footing ACC job status
                  * Polls the latest submitted footing ACC work item once
+                 * If the work item is successful, finalizes the ACC output file in ACC
+                 * If the work item is still running, returns the current status and report URL
+
+               - poll_pile_acc_job: Check pile ACC job status
+                 * Polls the latest submitted pile ACC work item once
                  * If the work item is successful, finalizes the ACC output file in ACC
                  * If the work item is still running, returns the current status and report URL
 
@@ -246,6 +262,9 @@ def workflow_agent_sync_stream(
                6. calculate_footing_sizing
                7. run_footing_acc_automation
                8. poll_footing_acc_job
+               9. calculate_pile_axial_capacity
+               10. run_pile_acc_automation
+               11. poll_pile_acc_job
 
             5. VISUALIZATION TOOLS
                - generate_plotly: Create line/bar plots from x and y data
@@ -306,6 +325,8 @@ def workflow_agent_sync_stream(
                  → Typically depends on: build_sap_model_from_analytical_json
                - run_footing_acc_automation: "Finalize ACC Footing Model"
                  → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_footing_sizing
+               - run_pile_acc_automation: "Finalize ACC Pile Model"
+                 → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_pile_axial_capacity
                - plot_output: Generic visualization node (no URL)
                - table_output: Table display node (no URL)
 

@@ -17,10 +17,12 @@ from app.viktor_tools.analytical_model_json_tool import (
 from app.viktor_tools.acc_workitem_polling_tool import (
     poll_analytical_model_acc_job_tool,
     poll_footing_acc_job_tool,
+    poll_pile_acc_job_tool,
 )
 from app.viktor_tools.footing_acc_automation_tool import (
     run_footing_acc_automation_tool,
 )
+from app.viktor_tools.pile_acc_automation_tool import run_pile_acc_automation_tool
 from app.viktor_tools.autodesk_context_tool import get_autodesk_file_context_tool
 from app.viktor_tools.autodesk_view_tool import show_hide_autodesk_view_tool
 from app.viktor_tools.plotting_tool import generate_plot, show_hide_plot_tool
@@ -46,6 +48,8 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "poll_analytical_model_acc_job": "Poll Analytical ACC Job",
     "run_footing_acc_automation": "Submit ACC Footing Model",
     "poll_footing_acc_job": "Poll Footing ACC Job",
+    "run_pile_acc_automation": "Submit ACC Pile Model",
+    "poll_pile_acc_job": "Poll Pile ACC Job",
     "get_autodesk_file_context": "Get ACC File Information",
     "show_hide_autodesk_view": "Display Revit Model",
     "show_hide_plot": "Show/Hide Plot",
@@ -114,6 +118,7 @@ class DummyWorkflowNode(BaseModel):
         "display_support_coordinates_table",
         "display_reaction_loads_table",
         "run_footing_acc_automation",
+        "run_pile_acc_automation",
         "plot_output",
         "table_output",
     ] = Field(..., description="Type of workflow node to add to the graph")
@@ -618,6 +623,8 @@ def get_tools() -> list[Any]:
         poll_analytical_model_acc_job_tool(),
         run_footing_acc_automation_tool(),
         poll_footing_acc_job_tool(),
+        run_pile_acc_automation_tool(),
+        poll_pile_acc_job_tool(),
         get_autodesk_file_context_tool(),
         generate_plot(),
         generate_table(),
