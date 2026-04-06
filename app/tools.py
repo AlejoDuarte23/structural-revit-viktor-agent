@@ -11,6 +11,10 @@ from app.viktor_tools.footing_sizing_tool import calculate_footing_sizing_tool
 from app.viktor_tools.analytical_model_json_tool import (
     extract_analytical_model_json_tool,
 )
+from app.viktor_tools.acc_workitem_polling_tool import (
+    poll_analytical_model_acc_job_tool,
+    poll_footing_acc_job_tool,
+)
 from app.viktor_tools.footing_acc_automation_tool import (
     run_footing_acc_automation_tool,
 )
@@ -34,8 +38,10 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "calculate_footing_sizing": "Footing Sizing",
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
-    "extract_analytical_model_json": "Get Revit Analytical Model",
-    "run_footing_acc_automation": "Finalize ACC Footing Model",
+    "extract_analytical_model_json": "Submit Analytical ACC Job",
+    "poll_analytical_model_acc_job": "Poll Analytical ACC Job",
+    "run_footing_acc_automation": "Submit ACC Footing Model",
+    "poll_footing_acc_job": "Poll Footing ACC Job",
     "get_autodesk_file_context": "Get ACC File Information",
     "show_hide_autodesk_view": "Display Revit Model",
     "show_hide_plot": "Show/Hide Plot",
@@ -603,7 +609,9 @@ def get_tools() -> list[Any]:
         display_reaction_loads_table_tool(),
         calculate_footing_sizing_tool(),
         extract_analytical_model_json_tool(),
+        poll_analytical_model_acc_job_tool(),
         run_footing_acc_automation_tool(),
+        poll_footing_acc_job_tool(),
         get_autodesk_file_context_tool(),
         generate_plot(),
         generate_table(),

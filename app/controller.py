@@ -11,7 +11,7 @@ from typing import Any
 from collections.abc import Callable
 
 import viktor as vkt
-from agents import Agent, Runner
+from agents import Agent, ItemHelpers, Runner
 from openai.types.responses import ResponseTextDeltaEvent
 from agents import set_tracing_disabled
 
@@ -139,12 +139,33 @@ def workflow_agent_sync_stream(
                  * Use action='show' when the user asks to open or display the model
                  * Use action='hide' when the user asks to close or hide the model viewer
 
-               - extract_analytical_model_json: Get Revit analytical model information
-                 * Runs the ACC automation on the selected Autodesk model
+               - extract_analytical_model_json: Submit Revit analytical model automation
+                 * Submits the ACC automation on the selected Autodesk model
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
-                 * Prints polling updates while the ACC work item runs
-                 * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * Stores the pending ACC job metadata, including the output storage id
+                 * Returns a work item id for later polling
+                 * Does not store the analytical JSON immediately
                  * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
+
+               - poll_analytical_model_acc_job: Check analytical ACC job status
+                 * Polls the latest submitted analytical ACC work item once
+                 * If the work item is successful, finalizes the ACC file, downloads the JSON,
+                   and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * If the work item is still running, returns the current status and report URL
+
+               LONG-RUNNING ACC JOBS:
+               - The Agents SDK has a built-in agent loop that can keep calling tools until the task is complete
+               - When the user wants an ACC job followed through to completion in the same run,
+                 use an agentic polling loop
+               - You MUST emit a separate assistant message item before EVERY poll tool call
+               - The message MUST be plain assistant text and MUST start with "Progress:"
+               - Do not call a poll tool silently and do not chain poll tool calls back-to-back without that message
+               - After submitting the job, send a short assistant progress message before each poll
+                 prefixed with "Progress:" such as "Progress: I'm polling the ACC job status now."
+               - Then call the matching poll tool with its default wait so checks happen about every 15 seconds
+               - If the poll tool says the job is still running, send another short "Progress:" message and poll again
+               - Stop only when the poll tool returns a terminal status
+               - Only continue to downstream tools after the required ACC finalization and storage step is complete
 
             2. SAP2000 WORKER FLOW
                Build and run the SAP2000 model from the exported analytical JSON:
@@ -159,8 +180,9 @@ def workflow_agent_sync_stream(
                (Tools → Set as active instance for API in SAP2000) before the worker runs.
 
                TYPICAL WORKFLOW:
-               1. extract_analytical_model_json → Export and store analytical JSON
-               2. build_sap_model_from_analytical_json → Create and run the SAP2000 model
+               1. extract_analytical_model_json → Submit analytical export
+               2. poll_analytical_model_acc_job → Repeat until success and JSON storage is complete
+               3. build_sap_model_from_analytical_json → Create and run the SAP2000 model
 
             3. DATA DISPLAY
                Transform stored SAP2000 data into reviewable outputs:
@@ -191,22 +213,29 @@ def workflow_agent_sync_stream(
                  * Can pass single combo name as string (e.g., 'ULS3')
                  * If None, uses all available combos for optimization
 
-               - run_footing_acc_automation: Finalize the ACC footing model
+               - run_footing_acc_automation: Submit the ACC footing model automation
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
                  * Reads footing data from Viktor Storage key 'footing_sizing_results'
                  * Sends only footing B, L, x, y, z values to the add-in payload
-                 * Prints polling updates while the ACC work item runs
-                 * Creates the generated output file directly in ACC in the same folder as the selected model
+                 * Submits the job and stores the pending ACC job metadata, including the output storage id
+                 * Returns a work item id for later polling
                  * Does not download the result locally or store it in Viktor Storage
                  * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
+
+               - poll_footing_acc_job: Check footing ACC job status
+                 * Polls the latest submitted footing ACC work item once
+                 * If the work item is successful, finalizes the ACC output file in ACC
+                 * If the work item is still running, returns the current status and report URL
 
                TYPICAL WORKFLOW:
                1. get_autodesk_file_context
                2. show_hide_autodesk_view (when the user wants the model displayed)
                3. extract_analytical_model_json
-               4. build_sap_model_from_analytical_json
-               5. calculate_footing_sizing
-               6. run_footing_acc_automation
+               4. poll_analytical_model_acc_job
+               5. build_sap_model_from_analytical_json
+               6. calculate_footing_sizing
+               7. run_footing_acc_automation
+               8. poll_footing_acc_job
 
             5. VISUALIZATION TOOLS
                - generate_plotly: Create line/bar plots from x and y data
@@ -273,6 +302,7 @@ def workflow_agent_sync_stream(
             - Export analytical data before building the SAP2000 model
             - Display support coordinates when the user wants a quick verification table
             - Run footing sizing before the ACC footing automation
+            - For long-running ACC jobs, use short assistant progress messages plus repeated poll tool calls until completion
             - Create workflow graphs to document process flow (optional)
             - **ALWAYS update plan task statuses** when a workflow plan is active:
               * Call get_workflow_plan FIRST to see existing task IDs and their current statuses
@@ -291,7 +321,7 @@ def workflow_agent_sync_stream(
                 agent,
                 input=chat_history,
                 context=AgentContext(autodesk_file=autodesk_file),
-                max_turns=20,
+                max_turns=100,
             )
 
             async for event in result.stream_events():
@@ -310,6 +340,15 @@ def workflow_agent_sync_stream(
                 if event.type == "run_item_stream_event":
                     item = event.item
                     raw = getattr(item, "raw_item", None)
+
+                    if (
+                        event.name == "message_output_created"
+                        and getattr(item, "type", None) == "message_output_item"
+                    ):
+                        text = ItemHelpers.text_message_output(item).strip()
+                        if text.startswith("Progress:"):
+                            q.put(f"\n\n{text}\n\n")
+                        continue
 
                     if event.name == "tool_called":
                         cid = _extract_call_id(raw)
