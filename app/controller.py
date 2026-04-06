@@ -213,6 +213,16 @@ def workflow_agent_sync_stream(
                  * Can pass single combo name as string (e.g., 'ULS3')
                  * If None, uses all available combos for optimization
 
+               - calculate_pile_axial_capacity: Run the pile axial capacity export app
+                 * URL: https://demo.viktor.ai/workspaces/2232/app/editor/11640
+                 * Automatically loads node coordinates and reaction loads from SAP2000 storage
+                 * REQUIRES: build_sap_model_from_analytical_json must be run first
+                 * Sends nodes_section.nodes and reaction_loads_section.load_cases built from SAP2000 storage
+                 * Sends pile_section, cap_section, soil_section, and concrete_section from tool inputs
+                 * Calls the remote app method 'download_results'
+                 * Stores the parsed exported JSON in 'pile_axial_capacity_results'
+                 * Use 'load_combinations_to_check' to limit the checked combinations; if omitted, all combinations are included
+
                - run_footing_acc_automation: Submit the ACC footing model automation
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
                  * Reads footing data from Viktor Storage key 'footing_sizing_results'
@@ -290,6 +300,9 @@ def workflow_agent_sync_stream(
                  → Typically depends on: build_sap_model_from_analytical_json
                - calculate_footing_sizing: "Footing Sizing"
                  → URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
+                 → Typically depends on: build_sap_model_from_analytical_json
+               - calculate_pile_axial_capacity: "Pile Axial Capacity"
+                 → URL: https://demo.viktor.ai/workspaces/2232/app/editor/11640
                  → Typically depends on: build_sap_model_from_analytical_json
                - run_footing_acc_automation: "Finalize ACC Footing Model"
                  → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_footing_sizing

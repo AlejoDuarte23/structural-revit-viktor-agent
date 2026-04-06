@@ -8,6 +8,9 @@ import viktor as vkt
 from app.workflow_graph.models import PlanTodo, ProgressStep, WorkflowPlan, WorkflowProgress
 from app.workflow_graph.state import build_canvas_state, load_canvas_state, save_canvas_state
 from app.viktor_tools.footing_sizing_tool import calculate_footing_sizing_tool
+from app.viktor_tools.pile_axial_capacity_tool import (
+    calculate_pile_axial_capacity_tool,
+)
 from app.viktor_tools.analytical_model_json_tool import (
     extract_analytical_model_json_tool,
 )
@@ -36,6 +39,7 @@ from app.sap_tools.display_reaction_loads_table import (
 # Friendly display names for tools in chat
 TOOL_DISPLAY_NAMES: dict[str, str] = {
     "calculate_footing_sizing": "Footing Sizing",
+    "calculate_pile_axial_capacity": "Pile Axial Capacity",
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
     "extract_analytical_model_json": "Submit Analytical ACC Job",
@@ -102,6 +106,7 @@ class DummyWorkflowNode(BaseModel):
         "sap2000_extraction",
         "footing_sizing",
         "calculate_footing_sizing",
+        "calculate_pile_axial_capacity",
         "get_autodesk_file_context",
         "show_hide_autodesk_view",
         "extract_analytical_model_json",
@@ -608,6 +613,7 @@ def get_tools() -> list[Any]:
         display_support_coordinates_table_tool(),
         display_reaction_loads_table_tool(),
         calculate_footing_sizing_tool(),
+        calculate_pile_axial_capacity_tool(),
         extract_analytical_model_json_tool(),
         poll_analytical_model_acc_job_tool(),
         run_footing_acc_automation_tool(),
