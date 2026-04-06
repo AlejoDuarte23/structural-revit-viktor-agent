@@ -1,13 +1,9 @@
-"""Run ACC automation on the selected Autodesk model and store the JSON result."""
+"""Submit ACC automation on the selected Autodesk model for later polling."""
 
-import json
 import logging
 import os
-import inspect
-import time
 import uuid
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -15,11 +11,10 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 ANALYTICAL_MODEL_STORAGE_KEY = "acc_analytical_model_json"
-TERMINAL_STATUSES = {"success", "failedUpload", "cancelled"}
 
 
 class ExtractAnalyticalModelJsonArgs(BaseModel):
-    """Arguments for running the analytical model ACC automation."""
+    """Arguments for submitting the analytical model ACC automation."""
 
     output_file_name: str = Field(
         default="analytical_model.json",
@@ -28,16 +23,6 @@ class ExtractAnalyticalModelJsonArgs(BaseModel):
     storage_key: str = Field(
         default=ANALYTICAL_MODEL_STORAGE_KEY,
         description="Viktor Storage key where the downloaded JSON should be stored.",
-    )
-    max_wait: int = Field(
-        default=1200,
-        ge=10,
-        description="Maximum time in seconds to wait for the ACC work item.",
-    )
-    interval: int = Field(
-        default=10,
-        ge=1,
-        description="Polling interval in seconds for work item status updates.",
     )
 
 
@@ -56,43 +41,6 @@ def _get_selected_autodesk_file(ctx: Any) -> Any:
     return autodesk_file
 
 
-def _poll_workitem_status(
-    workitem_id: str,
-    token3lo: str,
-    *,
-    max_wait: int,
-    interval: int,
-) -> dict[str, Any]:
-    from aps_automation_sdk.core import get_workitem_status
-
-    elapsed = 0
-    status_payload: dict[str, Any] = {}
-
-    while elapsed <= max_wait:
-        status_payload = get_workitem_status(workitem_id, token3lo)
-        status = status_payload.get("status", "unknown")
-        report_url = status_payload.get("reportUrl")
-        print(f"[{elapsed:>3}s] status={status} report_url={report_url}")
-
-        if status in TERMINAL_STATUSES:
-            return status_payload
-
-        time.sleep(interval)
-        elapsed += interval
-
-    raise TimeoutError(
-        f"ACC work item did not finish within {max_wait} seconds (workitem_id={workitem_id})."
-    )
-
-
-def _print_poll_event(event: Any) -> None:
-    print(
-        f"[{getattr(event, 'elapsed_seconds', 0):>3}s] "
-        f"status={getattr(event, 'status', 'unknown')} "
-        f"report_url={getattr(event, 'report_url', None)}"
-    )
-
-
 def _build_unique_output_file_name(file_name: str) -> str:
     path = Path(file_name)
     suffix = path.suffix or ".json"
@@ -109,6 +57,11 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
         )
 
         from app.aec import get_acc_automation_context
+        from app.viktor_tools.acc_workitem_polling_tool import (
+            ANALYTICAL_JOB_STORAGE_KEY,
+            PendingAccJob,
+            save_pending_job,
+        )
     except ImportError as e:
         return f"Error importing required modules: {e}."
 
@@ -151,59 +104,34 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
             f"for project_id={acc_context.project_id} item_urn={acc_context.input_item_urn}"
         )
 
-        execute_signature = inspect.signature(workitem.execute)
-        if "activity_signature" in execute_signature.parameters:
-            status_payload = workitem.execute(
-                token=acc_context.token3lo,
-                activity_signature=activity_signature,
-                max_wait=payload.max_wait,
-                interval=payload.interval,
-                on_event=_print_poll_event,
-            )
-        else:
-            workitem_id = workitem.run_public_activity(
-                token3lo=acc_context.token3lo,
-                activity_signature=activity_signature,
-            )
-            print(f"Work item created: {workitem_id}")
-            status_payload = _poll_workitem_status(
-                workitem_id,
-                acc_context.token3lo,
-                max_wait=payload.max_wait,
-                interval=payload.interval,
-            )
+        workitem_id = workitem.run_public_activity(
+            token3lo=acc_context.token3lo,
+            activity_signature=activity_signature,
+        )
+        print(f"Work item created: {workitem_id}")
 
-        status = status_payload.get("status")
-        report_url = status_payload.get("reportUrl")
-        if status != "success":
-            return (
-                f"ACC analytical model automation finished with status '{status}'. "
-                f"Report URL: {report_url or 'n/a'}"
-            )
+        if not output_acc._storage_id:
+            raise RuntimeError("ACC output storage id was not created during submission.")
 
-        created_item = output_acc.create_acc_item(acc_context.token3lo)
-        output_item_urn = ((created_item or {}).get("data") or {}).get("id")
-        print(f"ACC lineage URN: {output_item_urn}")
-
-        with TemporaryDirectory() as tmpdir:
-            local_output = Path(tmpdir) / output_file_name
-            output_acc.download_to(str(local_output), acc_context.token3lo)
-            print(f"Downloaded to: {local_output}")
-
-            parsed_json = json.loads(local_output.read_text(encoding="utf-8"))
-            data_json = json.dumps(parsed_json, indent=2)
-
-        vkt.Storage().set(
-            payload.storage_key,
-            data=vkt.File.from_data(data_json),
-            scope="entity",
+        save_pending_job(
+            vkt,
+            ANALYTICAL_JOB_STORAGE_KEY,
+            PendingAccJob(
+                job_type="analytical_model_json",
+                workitem_id=workitem_id,
+                project_id=acc_context.project_id,
+                folder_id=acc_context.output_folder_id,
+                file_name=output_file_name,
+                output_storage_id=output_acc._storage_id,
+                storage_key=payload.storage_key,
+            ),
         )
 
         return (
-            "Successfully generated analytical model JSON from ACC automation. "
-            f"Stored JSON in Viktor Storage with key '{payload.storage_key}'. "
-            f"Uploaded ACC file name: {output_file_name}. "
-            f"Output ACC item URN: {output_item_urn or 'unknown'}."
+            "Submitted ACC analytical model automation successfully. "
+            f"Work item id: {workitem_id}. "
+            f"Output ACC file name: {output_file_name}. "
+            "Use 'poll_analytical_model_acc_job' to check completion and store the JSON in Viktor Storage."
         )
 
     except Exception as e:
@@ -217,10 +145,11 @@ def extract_analytical_model_json_tool() -> Any:
     return FunctionTool(
         name="extract_analytical_model_json",
         description=(
-            "Run the ACC analytical model automation for the selected Autodesk model. "
+            "Submit the ACC analytical model automation for the selected Autodesk model. "
             "Uses the current Autodesk file to resolve project id, input item lineage URN, and output folder id. "
-            "Prints polling status updates while the ACC work item runs, then downloads the generated JSON "
-            "and stores it in Viktor Storage with key 'acc_analytical_model_json' by default. "
+            "Stores the pending ACC job metadata, including the output storage id, so a later poll can "
+            "finalize the ACC file, download the generated JSON, and store it in Viktor Storage with key "
+            "'acc_analytical_model_json' by default. "
             "Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE environment variables."
         ),
         params_json_schema=ExtractAnalyticalModelJsonArgs.model_json_schema(),

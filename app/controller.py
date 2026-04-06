@@ -139,12 +139,19 @@ def workflow_agent_sync_stream(
                  * Use action='show' when the user asks to open or display the model
                  * Use action='hide' when the user asks to close or hide the model viewer
 
-               - extract_analytical_model_json: Get Revit analytical model information
-                 * Runs the ACC automation on the selected Autodesk model
+               - extract_analytical_model_json: Submit Revit analytical model automation
+                 * Submits the ACC automation on the selected Autodesk model
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
-                 * Prints polling updates while the ACC work item runs
-                 * Downloads the generated JSON and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * Stores the pending ACC job metadata, including the output storage id
+                 * Returns a work item id for later polling
+                 * Does not store the analytical JSON immediately
                  * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
+
+               - poll_analytical_model_acc_job: Check analytical ACC job status
+                 * Polls the latest submitted analytical ACC work item once
+                 * If the work item is successful, finalizes the ACC file, downloads the JSON,
+                   and stores it in Viktor Storage with key 'acc_analytical_model_json'
+                 * If the work item is still running, returns the current status and report URL
 
             2. SAP2000 WORKER FLOW
                Build and run the SAP2000 model from the exported analytical JSON:
@@ -159,8 +166,9 @@ def workflow_agent_sync_stream(
                (Tools → Set as active instance for API in SAP2000) before the worker runs.
 
                TYPICAL WORKFLOW:
-               1. extract_analytical_model_json → Export and store analytical JSON
-               2. build_sap_model_from_analytical_json → Create and run the SAP2000 model
+               1. extract_analytical_model_json → Submit analytical export
+               2. poll_analytical_model_acc_job → Repeat until success and JSON storage is complete
+               3. build_sap_model_from_analytical_json → Create and run the SAP2000 model
 
             3. DATA DISPLAY
                Transform stored SAP2000 data into reviewable outputs:
@@ -191,22 +199,29 @@ def workflow_agent_sync_stream(
                  * Can pass single combo name as string (e.g., 'ULS3')
                  * If None, uses all available combos for optimization
 
-               - run_footing_acc_automation: Finalize the ACC footing model
+               - run_footing_acc_automation: Submit the ACC footing model automation
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
                  * Reads footing data from Viktor Storage key 'footing_sizing_results'
                  * Sends only footing B, L, x, y, z values to the add-in payload
-                 * Prints polling updates while the ACC work item runs
-                 * Creates the generated output file directly in ACC in the same folder as the selected model
+                 * Submits the job and stores the pending ACC job metadata, including the output storage id
+                 * Returns a work item id for later polling
                  * Does not download the result locally or store it in Viktor Storage
                  * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
+
+               - poll_footing_acc_job: Check footing ACC job status
+                 * Polls the latest submitted footing ACC work item once
+                 * If the work item is successful, finalizes the ACC output file in ACC
+                 * If the work item is still running, returns the current status and report URL
 
                TYPICAL WORKFLOW:
                1. get_autodesk_file_context
                2. show_hide_autodesk_view (when the user wants the model displayed)
                3. extract_analytical_model_json
-               4. build_sap_model_from_analytical_json
-               5. calculate_footing_sizing
-               6. run_footing_acc_automation
+               4. poll_analytical_model_acc_job
+               5. build_sap_model_from_analytical_json
+               6. calculate_footing_sizing
+               7. run_footing_acc_automation
+               8. poll_footing_acc_job
 
             5. VISUALIZATION TOOLS
                - generate_plotly: Create line/bar plots from x and y data
