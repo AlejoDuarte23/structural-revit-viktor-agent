@@ -122,7 +122,9 @@ def workflow_agent_sync_stream(
             - Be succinct and friendly - avoid over-elaboration
             - Don't aggressively propose actions - wait for user direction
             - Provide clear, concise responses
-            - Only suggest next steps when explicitly asked or when clarification is needed
+            - Suggest the next step when it directly helps complete the active workflow or plan
+            - Keep next-step suggestions limited to actions available through the current toolset
+            - Do not suggest actions outside the available tools unless clarification is needed
             - Markdown is allowed, but don't use tables; format with bold, headings, sections, and links.
             - You MUST emit a separate assistant message item before EVERY poll tool call for poll_footing_acc_job poll_footing_acc_job
             
