@@ -414,11 +414,22 @@ async def calculate_pile_axial_capacity_func(ctx: Any, args: str) -> str:
         logger.exception("Pile axial capacity request failed")
         return f"❌ Error running pile axial capacity tool: {type(e).__name__}: {e}"
 
+    # Swap y and z coordinates in placements before storing
+    swapped_placements = [
+        PileCapPlacement(x=p.x, y=p.z, z=p.y)
+        for p in result.placements
+    ]
+    result_with_swapped_coords = PileAxialCapacityOutput(
+        parameters=result.parameters,
+        placements=swapped_placements
+    )
+    logger.info("Swapped y ↔ z coordinates in placement data")
+
     try:
         vkt.Storage().set(
             PILE_AXIAL_CAPACITY_STORAGE_KEY,
             data=vkt.File.from_data(
-                json.dumps(result.model_dump(mode="json"), indent=2)
+                json.dumps(result_with_swapped_coords.model_dump(mode="json"), indent=2)
             ),
             scope="entity",
         )
@@ -435,10 +446,10 @@ async def calculate_pile_axial_capacity_func(ctx: Any, args: str) -> str:
     return (
         f"✅ Pile axial capacity export completed successfully{combo_msg}. "
         "Mark this task in the  execution plan as complete"
-        f"Prepared {len(result.placements)} placements. "
-        f"Export pile length: {result.parameters.pileLength:.0f} mm. "
-        f"Stored parsed JSON in Viktor Storage with key '{PILE_AXIAL_CAPACITY_STORAGE_KEY}'.\n\n"
-        f"Results: {json.dumps(result.model_dump(mode='json'), indent=2)}"
+        f"Prepared {len(result_with_swapped_coords.placements)} placements. "
+        f"Export pile length: {result_with_swapped_coords.parameters.pileLength:.0f} mm. "
+        f"Stored parsed JSON (with y ↔ z coordinate swap) in Viktor Storage with key '{PILE_AXIAL_CAPACITY_STORAGE_KEY}'.\n\n"
+        f"Results: {json.dumps(result_with_swapped_coords.model_dump(mode='json'), indent=2)}"
     )
 
 
