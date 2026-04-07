@@ -178,7 +178,11 @@ def workflow_agent_sync_stream(
                - The message MUST be plain assistant text and should sound natural
                - Do not call a poll tool silently and do not chain poll tool calls back-to-back without that message
                - After submitting the job, send a short natural status update before each poll
-                 such as "I'm checking the ACC job status now."
+               - In the first polling update after submission, mention the work item id
+               - In later polling updates, mention the current status instead of repeating the work item id
+               - Good pattern:
+                 * first update: "I'm checking ACC work item 12345 now."
+                 * later updates: "I'm checking the ACC job again. It is still in progress."
                - Then call the matching poll tool with its default wait so checks happen about every 10 seconds
                - If the poll tool says the job is still running, send another short natural update and poll again
                - Stop only when the poll tool returns a terminal status

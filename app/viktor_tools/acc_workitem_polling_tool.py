@@ -351,7 +351,9 @@ def poll_analytical_model_acc_job_tool() -> Any:
             "If it finished successfully, finalize the ACC output file, download the JSON, "
             "and store it in Viktor Storage. Designed for agentic polling loops. "
             "Before calling this tool in a loop, the agent should first emit a short natural "
-            "user-facing assistant status message."
+            "user-facing assistant status message. In the first polling update, mention the "
+            "work item id. In later polling updates, mention the current status instead of "
+            "repeating the work item id."
         ),
         params_json_schema=PollAnalyticalModelAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_analytical_model_acc_job_func,
@@ -367,7 +369,9 @@ def poll_footing_acc_job_tool() -> Any:
             "Wait about 10 seconds by default, then check the latest submitted ACC footing work item once. "
             "If it finished successfully, finalize the ACC output file in ACC. "
             "Designed for agentic polling loops. Before calling this tool in a loop, the agent should "
-            "first emit a short natural user-facing assistant status message."
+            "first emit a short natural user-facing assistant status message. In the first polling "
+            "update, mention the work item id. In later polling updates, mention the current status "
+            "instead of repeating the work item id."
         ),
         params_json_schema=PollFootingAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_footing_acc_job_func,
@@ -383,7 +387,9 @@ def poll_pile_acc_job_tool() -> Any:
             "Wait about 10 seconds by default, then check the latest submitted ACC pile work item once. "
             "If it finished successfully, finalize the ACC output file in ACC. "
             "Designed for agentic polling loops. Before calling this tool in a loop, the agent should "
-            "first emit a short natural user-facing assistant status message."
+            "first emit a short natural user-facing assistant status message. In the first polling "
+            "update, mention the work item id. In later polling updates, mention the current status "
+            "instead of repeating the work item id."
         ),
         params_json_schema=PollPileAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_pile_acc_job_func,
