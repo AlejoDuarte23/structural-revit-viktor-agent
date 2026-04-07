@@ -41,6 +41,7 @@ export class WorkflowGraph {
       },
       get_autodesk_file_context: {
         bg: "#F6C28B",
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
@@ -48,12 +49,14 @@ export class WorkflowGraph {
       show_hide_autodesk_view: {
         bg: "#FFFFFF",
         isOutput: true,
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
       },
       extract_analytical_model_json: {
         bg: "#F6C28B",
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
@@ -151,30 +154,35 @@ export class WorkflowGraph {
       },
       run_footing_acc_automation: {
         bg: "#F6C28B",
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
       },
       poll_analytical_model_acc_job: {
         bg: "#F6C28B",
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
       },
       poll_footing_acc_job: {
         bg: "#F6C28B",
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
       },
       poll_pile_acc_job: {
         bg: "#F6C28B",
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
       },
       run_pile_acc_automation: {
         bg: "#F6C28B",
+        iconClassName: "icon-autodesk",
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 500 281" fill="none">
           <path d="M130.299 222.384L278.52 130.269H355.413C357.785 130.269 359.902 132.159 359.902 134.755C359.902 136.871 358.971 137.83 357.785 138.535L284.959 182.124C280.215 184.974 278.577 190.645 278.577 194.877L278.492 222.356H371V62.6708C371 59.5956 368.628 57 365.098 57H276.854L129 148.692V222.356H130.299V222.384Z" fill="black"></path>
         </svg>`
@@ -693,7 +701,13 @@ export class WorkflowGraph {
       el.style.top = pos.y + "px";
       // Create clickable icon if URL exists
       const url = n.url || "";
-      const iconClass = url ? "icon clickable-icon" : "icon";
+      const iconClass = [
+        "icon",
+        url ? "clickable-icon" : "",
+        style.iconClassName || "",
+      ]
+        .filter(Boolean)
+        .join(" ");
 
       el.innerHTML = `
         <div class="${iconClass}" style="background:${style.bg};" data-url="${escapeHtml(url)}">
