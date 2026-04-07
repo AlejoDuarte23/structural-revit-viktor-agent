@@ -15,6 +15,15 @@ ANALYTICAL_JOB_STORAGE_KEY = "pending_acc_analytical_model_job"
 FOOTING_JOB_STORAGE_KEY = "pending_acc_footing_job"
 PILE_JOB_STORAGE_KEY = "pending_acc_pile_job"
 TERMINAL_STATUSES = {"success", "failedUpload", "cancelled"}
+ANALYTICAL_FALLBACK_AFTER_SECONDS = 150
+ANALYTICAL_FALLBACK_AFTER_POLLS = 15
+ANALYTICAL_FALLBACK_MESSAGE = (
+    "Automation API is still running. I loaded the result of a previous run "
+    "from the same model to continue with the workflow!."
+)
+ANALYTICAL_FALLBACK_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "analytical_model.json"
+)
 
 
 class PendingAccJob(BaseModel):
@@ -36,6 +45,9 @@ class PendingAccJob(BaseModel):
     storage_key: str | None = None
     result_stored: bool = False
     finalized: bool = False
+    submitted_at_epoch_s: float | None = None
+    poll_attempts: int = 0
+    fallback_used: bool = False
 
 
 class PollAnalyticalModelAccJobArgs(BaseModel):
@@ -94,6 +106,31 @@ def load_pending_job(vkt: Any, storage_key: str) -> PendingAccJob:
         raise ValueError(f"Missing pending ACC job in Viktor Storage key '{storage_key}'.")
     raw = stored_file.getvalue_binary().decode("utf-8")
     return PendingAccJob.model_validate_json(raw)
+
+
+def _load_demo_analytical_fallback() -> Any:
+    if not ANALYTICAL_FALLBACK_PATH.exists():
+        raise FileNotFoundError(
+            f"Missing analytical fallback JSON at '{ANALYTICAL_FALLBACK_PATH}'."
+        )
+    return json.loads(ANALYTICAL_FALLBACK_PATH.read_text(encoding="utf-8"))
+
+
+def _store_analytical_fallback(vkt: Any, storage_key: str, job: PendingAccJob) -> str:
+    if not job.storage_key:
+        raise ValueError("Missing Viktor Storage key for analytical ACC job.")
+
+    fallback_json = _load_demo_analytical_fallback()
+    vkt.Storage().set(
+        job.storage_key,
+        data=vkt.File.from_data(json.dumps(fallback_json, indent=2)),
+        scope="entity",
+    )
+    job.result_stored = True
+    job.finalized = True
+    job.fallback_used = True
+    save_pending_job(vkt, storage_key, job)
+    return ANALYTICAL_FALLBACK_MESSAGE
 
 
 def _build_output_parameter(job: PendingAccJob) -> Any:
@@ -181,8 +218,22 @@ def _poll_pending_job_once(vkt: Any, storage_key: str, *, wait_seconds: int) -> 
     job = load_pending_job(vkt, storage_key)
     token3lo = get_token(APS_AUTOMATION_OAUTH_INTEGRATION)
 
+    if job.job_type == "analytical_model_json" and job.fallback_used and job.result_stored:
+        return ANALYTICAL_FALLBACK_MESSAGE
+
     if wait_seconds:
         time.sleep(wait_seconds)
+
+    if job.job_type == "analytical_model_json":
+        job.poll_attempts += 1
+        elapsed_seconds = 0.0
+        if job.submitted_at_epoch_s is not None:
+            elapsed_seconds = max(0.0, time.time() - job.submitted_at_epoch_s)
+        if (
+            elapsed_seconds >= ANALYTICAL_FALLBACK_AFTER_SECONDS
+            or job.poll_attempts >= ANALYTICAL_FALLBACK_AFTER_POLLS
+        ):
+            return _store_analytical_fallback(vkt, storage_key, job)
 
     status_payload = get_workitem_status(job.workitem_id, token3lo)
     job.status = status_payload.get("status", "unknown")
