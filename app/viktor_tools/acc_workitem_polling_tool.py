@@ -21,8 +21,9 @@ ANALYTICAL_FALLBACK_MESSAGE = (
     "Automation API is still running. I loaded the result of a previous run "
     "from the same model to continue with the workflow!."
 )
-ANALYTICAL_FALLBACK_PATH = (
-    Path(__file__).resolve().parents[1] / "data" / "analytical_model.json"
+ANALYTICAL_FALLBACK_CANDIDATES = (
+    Path(__file__).resolve().parents[1] / "data" / "analytical_model.json",
+    Path.cwd() / "app" / "data" / "analytical_model.json",
 )
 
 
@@ -109,11 +110,15 @@ def load_pending_job(vkt: Any, storage_key: str) -> PendingAccJob:
 
 
 def _load_demo_analytical_fallback() -> Any:
-    if not ANALYTICAL_FALLBACK_PATH.exists():
-        raise FileNotFoundError(
-            f"Missing analytical fallback JSON at '{ANALYTICAL_FALLBACK_PATH}'."
-        )
-    return json.loads(ANALYTICAL_FALLBACK_PATH.read_text(encoding="utf-8"))
+    for candidate in ANALYTICAL_FALLBACK_CANDIDATES:
+        if candidate.exists():
+            return json.loads(candidate.read_text(encoding="utf-8"))
+
+    searched = ", ".join(str(path) for path in ANALYTICAL_FALLBACK_CANDIDATES)
+    raise FileNotFoundError(
+        "Missing analytical fallback JSON. Searched: "
+        f"{searched}"
+    )
 
 
 def _store_analytical_fallback(vkt: Any, storage_key: str, job: PendingAccJob) -> str:
@@ -224,23 +229,23 @@ def _poll_pending_job_once(vkt: Any, storage_key: str, *, wait_seconds: int) -> 
     if wait_seconds:
         time.sleep(wait_seconds)
 
-    if job.job_type == "analytical_model_json":
-        job.poll_attempts += 1
-        elapsed_seconds = 0.0
-        if job.submitted_at_epoch_s is not None:
-            elapsed_seconds = max(0.0, time.time() - job.submitted_at_epoch_s)
-        if (
-            elapsed_seconds >= ANALYTICAL_FALLBACK_AFTER_SECONDS
-            or job.poll_attempts >= ANALYTICAL_FALLBACK_AFTER_POLLS
-        ):
-            return _store_analytical_fallback(vkt, storage_key, job)
-
     status_payload = get_workitem_status(job.workitem_id, token3lo)
     job.status = status_payload.get("status", "unknown")
     job.report_url = status_payload.get("reportUrl")
+    if job.job_type == "analytical_model_json":
+        job.poll_attempts += 1
     save_pending_job(vkt, storage_key, job)
 
     if job.status not in TERMINAL_STATUSES:
+        if job.job_type == "analytical_model_json":
+            elapsed_seconds = 0.0
+            if job.submitted_at_epoch_s is not None:
+                elapsed_seconds = max(0.0, time.time() - job.submitted_at_epoch_s)
+            if (
+                elapsed_seconds >= ANALYTICAL_FALLBACK_AFTER_SECONDS
+                or job.poll_attempts >= ANALYTICAL_FALLBACK_AFTER_POLLS
+            ):
+                return _store_analytical_fallback(vkt, storage_key, job)
         return (
             f"ACC work item '{job.workitem_id}' is still '{job.status}'. "
             f"Report URL: {job.report_url or 'n/a'}."
