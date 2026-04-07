@@ -360,10 +360,10 @@ def workflow_agent_sync_stream(
                  → Typically depends on: get_autodesk_file_context
                - build_sap_model_from_analytical_json: "Create SAP Model"
                  → Typically depends on: extract_analytical_model_json
-               - calculate_footing_sizing: "Footing Sizing"
+               - calculate_footing_sizing: "Footing Sizing MCP"
                  → URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
                  → Typically depends on: build_sap_model_from_analytical_json
-               - calculate_pile_axial_capacity: "Pile Axial Capacity"
+               - calculate_pile_axial_capacity: "Pile Axial Capacity MCP"
                  → URL: https://demo.viktor.ai/workspaces/2232/app/editor/11640
                  → Typically depends on: build_sap_model_from_analytical_json
                - run_footing_acc_automation: "Finalize ACC Footing Model"
