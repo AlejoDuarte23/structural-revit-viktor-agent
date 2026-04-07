@@ -114,7 +114,6 @@ class DummyWorkflowNode(BaseModel):
         "display_reaction_loads_table",
         "run_footing_acc_automation",
         "run_pile_acc_automation",
-        "plot_output",
         "table_output",
     ] = Field(..., description="Type of workflow node to add to the graph")
     label: str = Field(..., description="Human-readable label for the node")
@@ -226,7 +225,6 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
         "build_sap_model_from_analytical_json",
         "display_reaction_loads_table",
         "run_footing_acc_automation",
-        "plot_output",
         "table_output",
     }
 

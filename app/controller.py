@@ -370,7 +370,6 @@ def workflow_agent_sync_stream(
                  → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_footing_sizing
                - run_pile_acc_automation: "Finalize ACC Pile Model"
                  → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_pile_axial_capacity
-               - plot_output: Generic visualization node (no URL)
                - table_output: Table display node (no URL)
 
             GENERAL APPROACH:
