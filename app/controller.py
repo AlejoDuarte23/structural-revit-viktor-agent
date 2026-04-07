@@ -94,6 +94,10 @@ def _extract_tool_name(raw: Any) -> str:
     return "tool"
 
 
+def _normalize_stream_text(text: str) -> str:
+    return " ".join(text.split()).strip()
+
+
 def workflow_agent_sync_stream(
     chat_history: list[dict[str, str]],
     *,
@@ -112,6 +116,8 @@ def workflow_agent_sync_stream(
 
     async def _produce() -> None:
         call_id_to_name: dict[str, str] = {}
+        pending_assistant_message: str | None = None
+        streamed_text = ""
         try:
             agent = Agent[AgentContext](
                 name="Structural Analysis Assistant",
@@ -405,6 +411,7 @@ def workflow_agent_sync_stream(
                     event.data, ResponseTextDeltaEvent
                 ):
                     if event.data.delta:
+                        streamed_text += event.data.delta
                         q.put(event.data.delta)
                     continue
 
@@ -422,10 +429,19 @@ def workflow_agent_sync_stream(
                     ):
                         text = ItemHelpers.text_message_output(item).strip()
                         if text:
-                            q.put(f"\n\n{text}\n\n")
+                            if _normalize_stream_text(text) == _normalize_stream_text(
+                                streamed_text
+                            ):
+                                pending_assistant_message = None
+                            else:
+                                pending_assistant_message = text
+                        streamed_text = ""
                         continue
 
                     if event.name == "tool_called":
+                        if pending_assistant_message:
+                            q.put(f"\n\n{pending_assistant_message}\n\n")
+                            pending_assistant_message = None
                         cid = _extract_call_id(raw)
                         tool_name = _extract_tool_name(raw)
                         if cid:
@@ -444,6 +460,8 @@ def workflow_agent_sync_stream(
         except Exception as e:
             q.put(f"\n\n⚠️ {type(e).__name__}: {e}\n")
         finally:
+            if pending_assistant_message:
+                q.put(f"\n\n{pending_assistant_message}\n\n")
             q.put(sentinel)
 
     asyncio.run_coroutine_threadsafe(_produce(), loop)
