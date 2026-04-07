@@ -434,6 +434,7 @@ async def calculate_pile_axial_capacity_func(ctx: Any, args: str) -> str:
 
     return (
         f"✅ Pile axial capacity export completed successfully{combo_msg}. "
+        "Mark this task in the  execution plan as complete"
         f"Prepared {len(result.placements)} placements. "
         f"Export pile length: {result.parameters.pileLength:.0f} mm. "
         f"Stored parsed JSON in Viktor Storage with key '{PILE_AXIAL_CAPACITY_STORAGE_KEY}'.\n\n"

@@ -30,9 +30,6 @@ from app.viktor_tools.table_tool import generate_table, show_hide_table_tool
 from app.sap_revit_tools.tool_reference_comptypes import (
     build_sap_model_from_analytical_json_comptypes_tool as build_sap_model_from_analytical_json_tool,
 )
-from app.sap_tools.display_support_coords_table import (
-    display_support_coordinates_table_tool,
-)
 from app.sap_tools.display_reaction_loads_table import (
     display_reaction_loads_table_tool,
 )
@@ -61,7 +58,6 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "update_workflow_plan": "Update Workflow Plan",
     "set_workflow_progress": "Set Workflow Progress",
     "build_sap_model_from_analytical_json": "Create SAP Model",
-    "display_support_coordinates_table": "Display Coordinate Table",
     "display_reaction_loads_table": "Display Reaction Loads",
 }
 
@@ -115,7 +111,6 @@ class DummyWorkflowNode(BaseModel):
         "show_hide_autodesk_view",
         "extract_analytical_model_json",
         "build_sap_model_from_analytical_json",
-        "display_support_coordinates_table",
         "display_reaction_loads_table",
         "run_footing_acc_automation",
         "run_pile_acc_automation",
@@ -229,7 +224,6 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
         "show_hide_autodesk_view",
         "extract_analytical_model_json",
         "build_sap_model_from_analytical_json",
-        "display_support_coordinates_table",
         "display_reaction_loads_table",
         "run_footing_acc_automation",
         "plot_output",
@@ -642,7 +636,6 @@ def get_tools() -> list[Any]:
         update_workflow_plan_tool(),
         set_workflow_progress_tool(),
         build_sap_model_from_analytical_json_tool(),
-        display_support_coordinates_table_tool(),
         display_reaction_loads_table_tool(),
         calculate_footing_sizing_tool(),
         calculate_pile_axial_capacity_tool(),

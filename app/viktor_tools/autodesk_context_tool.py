@@ -66,6 +66,7 @@ def get_autodesk_file_context_tool() -> Any:
         description=(
             "Inspect the selected Autodesk file context for testing. "
             "Returns metadata such as hub id, project id, item URN, version URN, and ACC output folder id."
+            "Remember to update execution plan"
         ),
         params_json_schema=GetAutodeskFileContextArgs.model_json_schema(),
         on_invoke_tool=get_autodesk_file_context_func,

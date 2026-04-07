@@ -201,6 +201,7 @@ async def run_pile_acc_automation_func(ctx: Any, args: str) -> str:
 
         return (
             "Submitted the pile ACC automation successfully. "
+            "Mark this task in the  execution plan as complete"
             f"Prepared {len(pile_payload.placements)} placements from storage. "
             f"Work item id: {workitem_id}. "
             f"Output ACC file name: {output_file_name}. "

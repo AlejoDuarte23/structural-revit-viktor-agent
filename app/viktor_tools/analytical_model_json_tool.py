@@ -132,6 +132,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
             f"Work item id: {workitem_id}. "
             f"Output ACC file name: {output_file_name}. "
             "Use 'poll_analytical_model_acc_job' to check completion and store the JSON in Viktor Storage."
+            "Remember to update execution plan"
         )
 
     except Exception as e:

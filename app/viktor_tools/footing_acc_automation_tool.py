@@ -192,6 +192,7 @@ async def run_footing_acc_automation_func(ctx: Any, args: str) -> str:
 
         return (
             "Submitted the footing ACC automation successfully. "
+            "Mark this task in the  execution plan as complete"
             f"Prepared {len(footing_payload)} footing entries from storage. "
             f"Work item id: {workitem_id}. "
             f"Output ACC file name: {output_file_name}. "

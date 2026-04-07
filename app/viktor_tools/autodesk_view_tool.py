@@ -29,7 +29,7 @@ async def show_hide_autodesk_view_func(ctx: Any, args: str) -> str:
         scope="entity",
     )
     print(f"Autodesk Viewer Visibility State Changed to {action}")
-    return f"Autodesk Viewer Visibility State Changed to {action}"
+    return f"Autodesk Viewer Visibility State Changed to {action}, if this task is in the Execution Plan mark it as complete."
 
 
 def show_hide_autodesk_view_tool() -> Any:

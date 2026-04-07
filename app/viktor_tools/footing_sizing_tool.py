@@ -330,6 +330,7 @@ async def calculate_footing_sizing_func(ctx: Any, args: str) -> str:
 
     return (
         f"✅ Footing sizing completed successfully{combo_msg}. "
+        "Mark this task in the  execution plan as complete"
         f"Generated governing pad sizing for {len(result)} nodes.\n\n"
         f"Results: {json.dumps({'nodes_sized': len(result), 'designs': design_summaries}, indent=2)}"
     )
