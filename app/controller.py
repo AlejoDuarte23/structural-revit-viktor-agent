@@ -94,6 +94,10 @@ def _extract_tool_name(raw: Any) -> str:
     return "tool"
 
 
+def _normalize_stream_text(text: str) -> str:
+    return " ".join(text.split()).strip()
+
+
 def workflow_agent_sync_stream(
     chat_history: list[dict[str, str]],
     *,
@@ -112,18 +116,28 @@ def workflow_agent_sync_stream(
 
     async def _produce() -> None:
         call_id_to_name: dict[str, str] = {}
+        pending_assistant_message: str | None = None
+        streamed_text = ""
         try:
             agent = Agent[AgentContext](
                 name="Structural Analysis Assistant",
                 instructions=dedent(
                     """You are a helpful assistant for structural engineering tasks using Autodesk analytical export, SAP2000 worker integration, and footing design tools.
 
+            IMPORTANT: POWERED BY VIKTOR MCP SERVER
+            You have access to production-grade VIKTOR apps as computational tools through the VIKTOR MCP server.
+            This means you can call verified engineering applications (like footing sizing calculators and pile capacity tools)
+            directly as tool functions—enabling real structural calculations with trusted, validated engineering logic.
+
             STYLE RULES:
             - Be succinct and friendly - avoid over-elaboration
             - Don't aggressively propose actions - wait for user direction
             - Provide clear, concise responses
-            - Only suggest next steps when explicitly asked or when clarification is needed
+            - Suggest the next step when it directly helps complete the active workflow or plan
+            - Do not suggest actions outside the available tools unless clarification is needed
             - Markdown is allowed, but don't use tables; format with bold, headings, sections, and links.
+            - You MUST emit a separate assistant message item before EVERY poll tool call for poll_footing_acc_job poll_footing_acc_job
+            - Update the Execution plan after making a tool call.
 
             YOUR CAPABILITIES:
 
@@ -146,24 +160,31 @@ def workflow_agent_sync_stream(
                  * Returns a work item id for later polling
                  * Does not store the analytical JSON immediately
                  * Requires APS_ACTIVITY_FULL_ALIAS and APS_ACTIVITY_SIGNATURE to be configured
+                 * You MUST emit a separate assistant message item before EVERY Submits tool call
 
                - poll_analytical_model_acc_job: Check analytical ACC job status
                  * Polls the latest submitted analytical ACC work item once
                  * If the work item is successful, finalizes the ACC file, downloads the JSON,
                    and stores it in Viktor Storage with key 'acc_analytical_model_json'
                  * If the work item is still running, returns the current status and report URL
-
+                 * You MUST emit a separate assistant message item before EVERY run_footing_acc_automation,
+                   tool call
+ 
                LONG-RUNNING ACC JOBS:
                - The Agents SDK has a built-in agent loop that can keep calling tools until the task is complete
                - When the user wants an ACC job followed through to completion in the same run,
                  use an agentic polling loop
                - You MUST emit a separate assistant message item before EVERY poll tool call
-               - The message MUST be plain assistant text and MUST start with "Progress:"
+               - The message MUST be plain assistant text and should sound natural
                - Do not call a poll tool silently and do not chain poll tool calls back-to-back without that message
-               - After submitting the job, send a short assistant progress message before each poll
-                 prefixed with "Progress:" such as "Progress: I'm polling the ACC job status now."
-               - Then call the matching poll tool with its default wait so checks happen about every 15 seconds
-               - If the poll tool says the job is still running, send another short "Progress:" message and poll again
+               - After submitting the job, send a short natural status update before each poll
+               - In the first polling update after submission, mention the work item id
+               - In later polling updates, mention the current status instead of repeating the work item id
+               - Good pattern:
+                 * first update: "I'm checking ACC work item 12345 now."
+                 * later updates: "I'm checking the ACC job again. It is still in progress."
+               - Then call the matching poll tool with its default wait so checks happen about every 10 seconds
+               - If the poll tool says the job is still running, send another short natural update and poll again
                - Stop only when the poll tool returns a terminal status
                - Only continue to downstream tools after the required ACC finalization and storage step is complete
 
@@ -187,19 +208,16 @@ def workflow_agent_sync_stream(
             3. DATA DISPLAY
                Transform stored SAP2000 data into reviewable outputs:
 
-               - display_support_coordinates_table: Show support nodes in table format
-                 * Columns: Joint, X (m), Y (m), Z (m), U1, U2, U3, R1, R2, R3
-                 * Automatically shows Table view panel
-                 * Must run build_sap_model_from_analytical_json first
-
                - display_reaction_loads_table: Show reaction loads in flattened table
                  * Columns: Node, Load Combo, F1 (kN), F2 (kN), F3 (kN), M1 (kN·m), M2 (kN·m), M3 (kN·m)
                  * Shows all nodes × all load combinations
                  * Automatically shows Table view panel
                  * Must run build_sap_model_from_analytical_json first
 
-            4. FOOTING WORKFLOW
-               - calculate_footing_sizing: Run foundation pad sizing
+            4. VIKTOR-MCPS FOOTING WORKFLOW
+               Leverage production VIKTOR apps as tools via MCP server—perform verified engineering calculations.
+
+               - calculate_footing_sizing: Run foundation pad sizing (VIKTOR app as tool through a mcp server)
                  * URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
                  * Automatically loads node coordinates and reaction loads from SAP2000 storage
                  * REQUIRES: build_sap_model_from_analytical_json must be run first
@@ -213,6 +231,16 @@ def workflow_agent_sync_stream(
                  * Can pass single combo name as string (e.g., 'ULS3')
                  * If None, uses all available combos for optimization
 
+               - calculate_pile_axial_capacity: Run pile axial capacity calculations (VIKTOR app as tool through a mcp server)
+                 * URL: https://demo.viktor.ai/workspaces/2232/app/editor/11640
+                 * Automatically loads node coordinates and reaction loads from SAP2000 storage
+                 * REQUIRES: build_sap_model_from_analytical_json must be run first
+                 * Sends nodes_section.nodes and reaction_loads_section.load_cases built from SAP2000 storage
+                 * Sends pile_section, cap_section, soil_section, and concrete_section from tool inputs
+                 * Calls the remote app method 'download_results'
+                 * Stores the parsed exported JSON in 'pile_axial_capacity_results'
+                 * Use 'load_combinations_to_check' to limit the checked combinations; if omitted, all combinations are included
+
                - run_footing_acc_automation: Submit the ACC footing model automation
                  * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
                  * Reads footing data from Viktor Storage key 'footing_sizing_results'
@@ -222,12 +250,29 @@ def workflow_agent_sync_stream(
                  * Does not download the result locally or store it in Viktor Storage
                  * Requires APS_ACTIVITY_FOOTING_FULL_ALIAS and APS_ACTIVITY_FOOTING_SIGNATURE to be configured
 
+               - run_pile_acc_automation: Submit the ACC pile model automation
+                 * Uses the selected Autodesk model to resolve project id, input lineage URN, and output folder id
+                 * Reads pile data from Viktor Storage key 'pile_axial_capacity_results'
+                 * Adds familyName, typeName, and units required by the add-in payload
+                 * Uploads the payload as 'pile_foundations.json'
+                 * Submits the job and stores the pending ACC job metadata, including the output storage id
+                 * Returns a work item id for later polling
+                 * Does not download the result locally or store it in Viktor Storage
+                 * Requires APS_ACTIVITY_PILE_FULL_ALIAS or APS_ACTIVITY_PILE_FOUNDATION_FULL_ALIAS,
+                   and APS_ACTIVITY_PILE_SIGNATURE or APS_ACTIVITY_PILE_FOUNDATION_SIGNATURE
+
                - poll_footing_acc_job: Check footing ACC job status
                  * Polls the latest submitted footing ACC work item once
                  * If the work item is successful, finalizes the ACC output file in ACC
                  * If the work item is still running, returns the current status and report URL
 
-               TYPICAL WORKFLOW:
+               - poll_pile_acc_job: Check pile ACC job status
+                 * Polls the latest submitted pile ACC work item once
+                 * If the work item is successful, finalizes the ACC output file in ACC
+                 * If the work item is still running, returns the current status and report URL
+
+               TYPICAL WORKFLOW OPTIONS:
+               Default footing workflow:
                1. get_autodesk_file_context
                2. show_hide_autodesk_view (when the user wants the model displayed)
                3. extract_analytical_model_json
@@ -236,6 +281,24 @@ def workflow_agent_sync_stream(
                6. calculate_footing_sizing
                7. run_footing_acc_automation
                8. poll_footing_acc_job
+
+               Alternative pile workflow:
+               1. get_autodesk_file_context
+               2. show_hide_autodesk_view (when the user wants the model displayed)
+               3. extract_analytical_model_json
+               4. poll_analytical_model_acc_job
+               5. build_sap_model_from_analytical_json
+               6. calculate_pile_axial_capacity
+               7. run_pile_acc_automation
+               8. poll_pile_acc_job
+
+               DEFAULT BEHAVIOR:
+               - Use the footing workflow by default
+               - Do not switch to the pile workflow unless the user explicitly asks for piles
+                 or confirms they want the pile option
+               - If the user asks for foundation automation without specifying footing vs piles,
+                 proceed with footing sizing and mention that a pile-based alternative is available
+                 - By default do not include both foundation types by default only show in the workflow graph the footing/pads
 
             5. VISUALIZATION TOOLS
                - generate_plotly: Create line/bar plots from x and y data
@@ -251,9 +314,19 @@ def workflow_agent_sync_stream(
             6. WORKFLOW GRAPHS (Optional)
                Create visual workflow diagrams to document engineering processes.
 
+               **ALWAYS START WITH WORKFLOW CREATION**
+               If there's no user message or it's the first interaction:
+               - FIRST call compose_workflow_graph() to create the workflow visualization
+               - THEN call set_workflow_plan() to populate the plan card
+               - This ensures users always see the workflow structure upfront
+
                **CRITICAL: Always Track Task Progress**
                When a workflow plan exists, you MUST update task statuses as you work:
                - **BEFORE updating any task**: ALWAYS call 'get_workflow_plan' first to see existing task IDs and statuses
+               - If 'get_workflow_plan' reports missing prerequisites instead of a plan,
+                 do not treat that as a hard failure
+               - In that case, create the missing workflow prerequisites first:
+                 run 'compose_workflow_graph' if the graph does not exist, then run 'set_workflow_plan'
                - Mark tasks as "in_progress" when you START executing them
                - Mark tasks as "completed" immediately when you FINISH them successfully
                - Mark tasks as "failed" if they encounter errors
@@ -268,13 +341,18 @@ def workflow_agent_sync_stream(
                - set_workflow_progress: Show or clear the execution progress tracker below the plan
 
                Example workflow with status updates:
-               1. Check plan: get_workflow_plan() → returns existing task IDs
-               2. Start task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "in_progress"}])
-               3. Execute: extract_analytical_model_json(...)
-               4. Complete task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "completed"}])
-               5. Check plan again: get_workflow_plan() → see updated statuses
-               6. Start next task: update_workflow_plan(todos=[{"id": "build_sap_model", "status": "in_progress"}])
-               7. And so on...
+               1. Create workflow (if no user message or workflow doesn't exist):
+                  - Call compose_workflow_graph() to create the workflow visualization
+                  - Call set_workflow_plan() to populate the plan card
+               2. Check plan: get_workflow_plan() → returns existing task IDs
+                  If it returns a missing-prerequisite response, go back to step 1
+               3. Start task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "in_progress"}])
+               4. Execute: extract_analytical_model_json(...)
+               5. Complete task: update_workflow_plan(todos=[{"id": "extract_analytical", "status": "completed"}])
+               6. Check plan again: get_workflow_plan() → see updated statuses
+               7. Start next task: update_workflow_plan(todos=[{"id": "build_sap_model", "status": "in_progress"}])
+               8. And so on...
+               9. After completing each task: Guide the user to the next step in the workflow based on the plan
 
                **IMPORTANT**: Never create new tasks when updating - always use existing task IDs from get_workflow_plan!
 
@@ -286,30 +364,36 @@ def workflow_agent_sync_stream(
                  → Typically depends on: get_autodesk_file_context
                - build_sap_model_from_analytical_json: "Create SAP Model"
                  → Typically depends on: extract_analytical_model_json
-               - display_support_coordinates_table: "Display Coordinate Table"
-                 → Typically depends on: build_sap_model_from_analytical_json
-               - calculate_footing_sizing: "Footing Sizing"
+               - calculate_footing_sizing: "Footing Sizing MCP"
                  → URL: https://demo.viktor.ai/workspaces/2141/app/editor/11536
+                 → Typically depends on: build_sap_model_from_analytical_json
+               - calculate_pile_axial_capacity: "Pile Axial Capacity MCP"
+                 → URL: https://demo.viktor.ai/workspaces/2232/app/editor/11640
                  → Typically depends on: build_sap_model_from_analytical_json
                - run_footing_acc_automation: "Finalize ACC Footing Model"
                  → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_footing_sizing
-               - plot_output: Generic visualization node (no URL)
+               - run_pile_acc_automation: "Finalize ACC Pile Model"
+                 → Typically depends on: get_autodesk_file_context, build_sap_model_from_analytical_json, calculate_pile_axial_capacity
                - table_output: Table display node (no URL)
 
             GENERAL APPROACH:
+            - Always create workflow visualization at the start (if no user message or first interaction)
             - Start from the selected ACC/Revit model context
             - Show the Autodesk viewer when the user wants to inspect the model
             - Export analytical data before building the SAP2000 model
-            - Display support coordinates when the user wants a quick verification table
             - Run footing sizing before the ACC footing automation
             - For long-running ACC jobs, use short assistant progress messages plus repeated poll tool calls until completion
-            - Create workflow graphs to document process flow (optional)
             - **ALWAYS update plan task statuses** when a workflow plan is active:
               * Call get_workflow_plan FIRST to see existing task IDs and their current statuses
+              * If get_workflow_plan reports missing prerequisites, create the workflow graph and plan first instead of failing
               * Call update_workflow_plan to mark tasks as "in_progress" when starting (use exact IDs from get_workflow_plan)
               * Call update_workflow_plan to mark tasks as "completed" when done (use exact IDs from get_workflow_plan)
               * Call update_workflow_plan to mark tasks as "failed" if errors occur (use exact IDs from get_workflow_plan)
               * NEVER create new tasks - always update existing ones using the IDs from get_workflow_plan
+            - **GUIDE USER TO NEXT STEP** after completing each task:
+              * Call get_workflow_plan to check for pending tasks
+              * Inform the user what was completed and suggest the next step in the workflow
+              * Make it clear what action they should take next or ask if they want to proceed
             """
                 ),
                 model="gpt-5-mini",
@@ -330,6 +414,7 @@ def workflow_agent_sync_stream(
                     event.data, ResponseTextDeltaEvent
                 ):
                     if event.data.delta:
+                        streamed_text += event.data.delta
                         q.put(event.data.delta)
                     continue
 
@@ -346,11 +431,20 @@ def workflow_agent_sync_stream(
                         and getattr(item, "type", None) == "message_output_item"
                     ):
                         text = ItemHelpers.text_message_output(item).strip()
-                        if text.startswith("Progress:"):
-                            q.put(f"\n\n{text}\n\n")
+                        if text:
+                            if _normalize_stream_text(text) == _normalize_stream_text(
+                                streamed_text
+                            ):
+                                pending_assistant_message = None
+                            else:
+                                pending_assistant_message = text
+                        streamed_text = ""
                         continue
 
                     if event.name == "tool_called":
+                        if pending_assistant_message:
+                            q.put(f"\n\n{pending_assistant_message}\n\n")
+                            pending_assistant_message = None
                         cid = _extract_call_id(raw)
                         tool_name = _extract_tool_name(raw)
                         if cid:
@@ -369,6 +463,8 @@ def workflow_agent_sync_stream(
         except Exception as e:
             q.put(f"\n\n⚠️ {type(e).__name__}: {e}\n")
         finally:
+            if pending_assistant_message:
+                q.put(f"\n\n{pending_assistant_message}\n\n")
             q.put(sentinel)
 
     asyncio.run_coroutine_threadsafe(_produce(), loop)

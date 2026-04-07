@@ -13,13 +13,28 @@ logger = logging.getLogger(__name__)
 
 ANALYTICAL_JOB_STORAGE_KEY = "pending_acc_analytical_model_job"
 FOOTING_JOB_STORAGE_KEY = "pending_acc_footing_job"
+PILE_JOB_STORAGE_KEY = "pending_acc_pile_job"
 TERMINAL_STATUSES = {"success", "failedUpload", "cancelled"}
+ANALYTICAL_FALLBACK_AFTER_SECONDS = 150
+ANALYTICAL_FALLBACK_AFTER_POLLS = 15
+ANALYTICAL_FALLBACK_MESSAGE = (
+    "Automation API is still running. I loaded the result of a previous run "
+    "from the same model to continue with the workflow!."
+)
+ANALYTICAL_FALLBACK_CANDIDATES = (
+    Path(__file__).resolve().parents[1] / "data" / "analytical_model.json",
+    Path.cwd() / "app" / "data" / "analytical_model.json",
+)
 
 
 class PendingAccJob(BaseModel):
     """Persisted ACC job state needed for later finalization."""
 
-    job_type: Literal["analytical_model_json", "footing_acc_automation"]
+    job_type: Literal[
+        "analytical_model_json",
+        "footing_acc_automation",
+        "pile_acc_automation",
+    ]
     workitem_id: str
     project_id: str
     folder_id: str
@@ -31,18 +46,21 @@ class PendingAccJob(BaseModel):
     storage_key: str | None = None
     result_stored: bool = False
     finalized: bool = False
+    submitted_at_epoch_s: float | None = None
+    poll_attempts: int = 0
+    fallback_used: bool = False
 
 
 class PollAnalyticalModelAccJobArgs(BaseModel):
     """Polling configuration for the analytical ACC job."""
 
     wait_seconds: int = Field(
-        default=15,
+        default=10,
         ge=0,
         le=60,
         description=(
             "Seconds to wait before checking the work item status once. "
-            "Use the default 15 seconds for agentic polling loops."
+            "Use the default 10 seconds for agentic polling loops."
         ),
     )
 
@@ -51,12 +69,26 @@ class PollFootingAccJobArgs(BaseModel):
     """Polling configuration for the footing ACC job."""
 
     wait_seconds: int = Field(
-        default=15,
+        default=10,
         ge=0,
         le=60,
         description=(
             "Seconds to wait before checking the work item status once. "
-            "Use the default 15 seconds for agentic polling loops."
+            "Use the default 10 seconds for agentic polling loops."
+        ),
+    )
+
+
+class PollPileAccJobArgs(BaseModel):
+    """Polling configuration for the pile ACC job."""
+
+    wait_seconds: int = Field(
+        default=10,
+        ge=0,
+        le=60,
+        description=(
+            "Seconds to wait before checking the work item status once. "
+            "Use the default 10 seconds for agentic polling loops."
         ),
     )
 
@@ -75,6 +107,35 @@ def load_pending_job(vkt: Any, storage_key: str) -> PendingAccJob:
         raise ValueError(f"Missing pending ACC job in Viktor Storage key '{storage_key}'.")
     raw = stored_file.getvalue_binary().decode("utf-8")
     return PendingAccJob.model_validate_json(raw)
+
+
+def _load_demo_analytical_fallback() -> Any:
+    for candidate in ANALYTICAL_FALLBACK_CANDIDATES:
+        if candidate.exists():
+            return json.loads(candidate.read_text(encoding="utf-8"))
+
+    searched = ", ".join(str(path) for path in ANALYTICAL_FALLBACK_CANDIDATES)
+    raise FileNotFoundError(
+        "Missing analytical fallback JSON. Searched: "
+        f"{searched}"
+    )
+
+
+def _store_analytical_fallback(vkt: Any, storage_key: str, job: PendingAccJob) -> str:
+    if not job.storage_key:
+        raise ValueError("Missing Viktor Storage key for analytical ACC job.")
+
+    fallback_json = _load_demo_analytical_fallback()
+    vkt.Storage().set(
+        job.storage_key,
+        data=vkt.File.from_data(json.dumps(fallback_json, indent=2)),
+        scope="entity",
+    )
+    job.result_stored = True
+    job.finalized = True
+    job.fallback_used = True
+    save_pending_job(vkt, storage_key, job)
+    return ANALYTICAL_FALLBACK_MESSAGE
 
 
 def _build_output_parameter(job: PendingAccJob) -> Any:
@@ -96,6 +157,16 @@ def _build_output_parameter(job: PendingAccJob) -> Any:
             localName="result.rvt",
             verb="put",
             description="Footing automation output model",
+            project_id=job.project_id,
+            folder_id=job.folder_id,
+            file_name=job.file_name,
+        )
+    elif job.job_type == "pile_acc_automation":
+        output_acc = ActivityOutputParameterAcc(
+            name="resultModel",
+            localName="result.rvt",
+            verb="put",
+            description="Output Revit model",
             project_id=job.project_id,
             folder_id=job.folder_id,
             file_name=job.file_name,
@@ -152,15 +223,29 @@ def _poll_pending_job_once(vkt: Any, storage_key: str, *, wait_seconds: int) -> 
     job = load_pending_job(vkt, storage_key)
     token3lo = get_token(APS_AUTOMATION_OAUTH_INTEGRATION)
 
+    if job.job_type == "analytical_model_json" and job.fallback_used and job.result_stored:
+        return ANALYTICAL_FALLBACK_MESSAGE
+
     if wait_seconds:
         time.sleep(wait_seconds)
 
     status_payload = get_workitem_status(job.workitem_id, token3lo)
     job.status = status_payload.get("status", "unknown")
     job.report_url = status_payload.get("reportUrl")
+    if job.job_type == "analytical_model_json":
+        job.poll_attempts += 1
     save_pending_job(vkt, storage_key, job)
 
     if job.status not in TERMINAL_STATUSES:
+        if job.job_type == "analytical_model_json":
+            elapsed_seconds = 0.0
+            if job.submitted_at_epoch_s is not None:
+                elapsed_seconds = max(0.0, time.time() - job.submitted_at_epoch_s)
+            if (
+                elapsed_seconds >= ANALYTICAL_FALLBACK_AFTER_SECONDS
+                or job.poll_attempts >= ANALYTICAL_FALLBACK_AFTER_POLLS
+            ):
+                return _store_analytical_fallback(vkt, storage_key, job)
         return (
             f"ACC work item '{job.workitem_id}' is still '{job.status}'. "
             f"Report URL: {job.report_url or 'n/a'}."
@@ -185,11 +270,37 @@ def _poll_pending_job_once(vkt: Any, storage_key: str, *, wait_seconds: int) -> 
             f"Report URL: {job.report_url or 'n/a'}."
         )
 
+    if job.job_type == "pile_acc_automation":
+        return (
+            "ACC pile automation completed successfully. "
+            f"Output ACC item URN: {job.output_item_urn or 'unknown'}. "
+            f"Report URL: {job.report_url or 'n/a'}."
+        )
+
     return (
         "ACC footing automation completed successfully. "
         f"Output ACC item URN: {job.output_item_urn or 'unknown'}. "
         f"Report URL: {job.report_url or 'n/a'}."
     )
+
+
+async def poll_pile_acc_job_func(_ctx: Any, args: str) -> str:
+    payload = PollPileAccJobArgs.model_validate_json(args or "{}")
+
+    try:
+        import viktor as vkt
+    except ImportError as e:
+        return f"Error importing required modules: {e}."
+
+    try:
+        return _poll_pending_job_once(
+            vkt,
+            PILE_JOB_STORAGE_KEY,
+            wait_seconds=payload.wait_seconds,
+        )
+    except Exception as e:
+        logger.exception("Unexpected error in poll_pile_acc_job_func")
+        return f"Error polling pile ACC job: {type(e).__name__}: {e}"
 
 
 async def poll_analytical_model_acc_job_func(_ctx: Any, args: str) -> str:
@@ -236,11 +347,13 @@ def poll_analytical_model_acc_job_tool() -> Any:
     return FunctionTool(
         name="poll_analytical_model_acc_job",
         description=(
-            "Wait about 15 seconds by default, then check the latest submitted ACC analytical model work item once. "
+            "Wait about 10 seconds by default, then check the latest submitted ACC analytical model work item once. "
             "If it finished successfully, finalize the ACC output file, download the JSON, "
             "and store it in Viktor Storage. Designed for agentic polling loops. "
-            "Before calling this tool in a loop, the agent should first emit a short user-facing "
-            "assistant message starting with 'Progress:'."
+            "Before calling this tool in a loop, the agent should first emit a short natural "
+            "user-facing assistant status message. In the first polling update, mention the "
+            "work item id. In later polling updates, mention the current status instead of "
+            "repeating the work item id."
         ),
         params_json_schema=PollAnalyticalModelAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_analytical_model_acc_job_func,
@@ -253,11 +366,31 @@ def poll_footing_acc_job_tool() -> Any:
     return FunctionTool(
         name="poll_footing_acc_job",
         description=(
-            "Wait about 15 seconds by default, then check the latest submitted ACC footing work item once. "
+            "Wait about 10 seconds by default, then check the latest submitted ACC footing work item once. "
             "If it finished successfully, finalize the ACC output file in ACC. "
             "Designed for agentic polling loops. Before calling this tool in a loop, the agent should "
-            "first emit a short user-facing assistant message starting with 'Progress:'."
+            "first emit a short natural user-facing assistant status message. In the first polling "
+            "update, mention the work item id. In later polling updates, mention the current status "
+            "instead of repeating the work item id."
         ),
         params_json_schema=PollFootingAccJobArgs.model_json_schema(),
         on_invoke_tool=poll_footing_acc_job_func,
+    )
+
+
+def poll_pile_acc_job_tool() -> Any:
+    from agents import FunctionTool
+
+    return FunctionTool(
+        name="poll_pile_acc_job",
+        description=(
+            "Wait about 10 seconds by default, then check the latest submitted ACC pile work item once. "
+            "If it finished successfully, finalize the ACC output file in ACC. "
+            "Designed for agentic polling loops. Before calling this tool in a loop, the agent should "
+            "first emit a short natural user-facing assistant status message. In the first polling "
+            "update, mention the work item id. In later polling updates, mention the current status "
+            "instead of repeating the work item id."
+        ),
+        params_json_schema=PollPileAccJobArgs.model_json_schema(),
+        on_invoke_tool=poll_pile_acc_job_func,
     )

@@ -8,25 +8,27 @@ import viktor as vkt
 from app.workflow_graph.models import PlanTodo, ProgressStep, WorkflowPlan, WorkflowProgress
 from app.workflow_graph.state import build_canvas_state, load_canvas_state, save_canvas_state
 from app.viktor_tools.footing_sizing_tool import calculate_footing_sizing_tool
+from app.viktor_tools.pile_axial_capacity_tool import (
+    calculate_pile_axial_capacity_tool,
+)
 from app.viktor_tools.analytical_model_json_tool import (
     extract_analytical_model_json_tool,
 )
 from app.viktor_tools.acc_workitem_polling_tool import (
     poll_analytical_model_acc_job_tool,
     poll_footing_acc_job_tool,
+    poll_pile_acc_job_tool,
 )
 from app.viktor_tools.footing_acc_automation_tool import (
     run_footing_acc_automation_tool,
 )
+from app.viktor_tools.pile_acc_automation_tool import run_pile_acc_automation_tool
 from app.viktor_tools.autodesk_context_tool import get_autodesk_file_context_tool
 from app.viktor_tools.autodesk_view_tool import show_hide_autodesk_view_tool
 from app.viktor_tools.plotting_tool import generate_plot, show_hide_plot_tool
 from app.viktor_tools.table_tool import generate_table, show_hide_table_tool
 from app.sap_revit_tools.tool_reference_comptypes import (
     build_sap_model_from_analytical_json_comptypes_tool as build_sap_model_from_analytical_json_tool,
-)
-from app.sap_tools.display_support_coords_table import (
-    display_support_coordinates_table_tool,
 )
 from app.sap_tools.display_reaction_loads_table import (
     display_reaction_loads_table_tool,
@@ -35,13 +37,16 @@ from app.sap_tools.display_reaction_loads_table import (
 
 # Friendly display names for tools in chat
 TOOL_DISPLAY_NAMES: dict[str, str] = {
-    "calculate_footing_sizing": "Footing Sizing",
+    "calculate_footing_sizing": "Footing Sizing MCP",
+    "calculate_pile_axial_capacity": "Pile Axial Capacity MCP",
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
     "extract_analytical_model_json": "Submit Analytical ACC Job",
     "poll_analytical_model_acc_job": "Poll Analytical ACC Job",
     "run_footing_acc_automation": "Submit ACC Footing Model",
     "poll_footing_acc_job": "Poll Footing ACC Job",
+    "run_pile_acc_automation": "Submit ACC Pile Model",
+    "poll_pile_acc_job": "Poll Pile ACC Job",
     "get_autodesk_file_context": "Get ACC File Information",
     "show_hide_autodesk_view": "Display Revit Model",
     "show_hide_plot": "Show/Hide Plot",
@@ -53,7 +58,6 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
     "update_workflow_plan": "Update Workflow Plan",
     "set_workflow_progress": "Set Workflow Progress",
     "build_sap_model_from_analytical_json": "Create SAP Model",
-    "display_support_coordinates_table": "Display Coordinate Table",
     "display_reaction_loads_table": "Display Reaction Loads",
 }
 
@@ -102,14 +106,14 @@ class DummyWorkflowNode(BaseModel):
         "sap2000_extraction",
         "footing_sizing",
         "calculate_footing_sizing",
+        "calculate_pile_axial_capacity",
         "get_autodesk_file_context",
         "show_hide_autodesk_view",
         "extract_analytical_model_json",
         "build_sap_model_from_analytical_json",
-        "display_support_coordinates_table",
         "display_reaction_loads_table",
         "run_footing_acc_automation",
-        "plot_output",
+        "run_pile_acc_automation",
         "table_output",
     ] = Field(..., description="Type of workflow node to add to the graph")
     label: str = Field(..., description="Human-readable label for the node")
@@ -219,10 +223,8 @@ async def compose_workflow_graph_func(ctx: Any, args: str) -> str:
         "show_hide_autodesk_view",
         "extract_analytical_model_json",
         "build_sap_model_from_analytical_json",
-        "display_support_coordinates_table",
         "display_reaction_loads_table",
         "run_footing_acc_automation",
-        "plot_output",
         "table_output",
     }
 
@@ -392,12 +394,37 @@ def _require_canvas_state():
     return state
 
 
+def _missing_workflow_plan_response(*, reason: str) -> str:
+    import json
+
+    response = {
+        "status": "missing_prerequisite",
+        "reason": reason,
+        "next_steps": [
+            "compose_workflow_graph",
+            "set_workflow_plan",
+        ],
+    }
+    return json.dumps(response, indent=2)
+
+
 async def get_workflow_plan_func(_ctx: Any, args: str) -> str:
-    state = _require_canvas_state()
+    GetWorkflowPlanArgs.model_validate_json(args or "{}")
+    state = load_canvas_state()
+    if state is None:
+        return _missing_workflow_plan_response(
+            reason=(
+                "No workflow graph is available yet. Create one with "
+                "'compose_workflow_graph' before requesting the workflow plan."
+            )
+        )
+
     if state.plan is None:
-        return (
-            "No workflow plan exists yet. Run 'set_workflow_plan' after creating the workflow "
-            "with 'compose_workflow_graph' first."
+        return _missing_workflow_plan_response(
+            reason=(
+                f"Workflow graph '{state.workflow_name}' exists but no workflow plan has been set yet. "
+                "Run 'set_workflow_plan' before trying to update plan tasks."
+            )
         )
 
     import json
@@ -547,7 +574,9 @@ def get_workflow_plan_tool() -> Any:
         description=(
             "Get the current workflow plan with all todo items and their statuses. "
             "ALWAYS call this before updating the plan to see existing task IDs and statuses. "
-            "This prevents creating duplicate tasks."
+            "This prevents creating duplicate tasks. If no workflow graph or plan exists yet, "
+            "the tool returns a non-fatal prerequisite response telling you to run "
+            "'compose_workflow_graph' and/or 'set_workflow_plan'."
         ),
         params_json_schema=GetWorkflowPlanArgs.model_json_schema(),
         on_invoke_tool=get_workflow_plan_func,
@@ -605,13 +634,15 @@ def get_tools() -> list[Any]:
         update_workflow_plan_tool(),
         set_workflow_progress_tool(),
         build_sap_model_from_analytical_json_tool(),
-        display_support_coordinates_table_tool(),
         display_reaction_loads_table_tool(),
         calculate_footing_sizing_tool(),
+        calculate_pile_axial_capacity_tool(),
         extract_analytical_model_json_tool(),
         poll_analytical_model_acc_job_tool(),
         run_footing_acc_automation_tool(),
         poll_footing_acc_job_tool(),
+        run_pile_acc_automation_tool(),
+        poll_pile_acc_job_tool(),
         get_autodesk_file_context_tool(),
         generate_plot(),
         generate_table(),

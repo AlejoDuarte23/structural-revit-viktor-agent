@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -124,6 +125,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
                 file_name=output_file_name,
                 output_storage_id=output_acc._storage_id,
                 storage_key=payload.storage_key,
+                submitted_at_epoch_s=time.time(),
             ),
         )
 
@@ -132,6 +134,7 @@ async def extract_analytical_model_json_func(ctx: Any, args: str) -> str:
             f"Work item id: {workitem_id}. "
             f"Output ACC file name: {output_file_name}. "
             "Use 'poll_analytical_model_acc_job' to check completion and store the JSON in Viktor Storage."
+            "Remember to update execution plan"
         )
 
     except Exception as e:

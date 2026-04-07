@@ -134,6 +134,7 @@ def display_reaction_loads_table_tool() -> Any:
             "Forces are in kN, moments are in kN·m. "
             "The table is automatically displayed in the Table view panel (unless auto_show=False). "
             "IMPORTANT: Must run 'build_sap_model_from_analytical_json' first to populate SAP2000 result storage."
+            "Mark this task in the workflow as completed!"
         ),
         params_json_schema=DisplayReactionLoadsArgs.model_json_schema(),
         on_invoke_tool=display_reaction_loads_table_func,
