@@ -37,8 +37,8 @@ from app.sap_tools.display_reaction_loads_table import (
 
 # Friendly display names for tools in chat
 TOOL_DISPLAY_NAMES: dict[str, str] = {
-    "calculate_footing_sizing": "Footing Sizing",
-    "calculate_pile_axial_capacity": "Pile Axial Capacity",
+    "calculate_footing_sizing": "Footing Sizing MCP",
+    "calculate_pile_axial_capacity": "Pile Axial Capacity MCP",
     "generate_plotly": "Generate Plot",
     "generate_table": "Generate Table",
     "extract_analytical_model_json": "Submit Analytical ACC Job",
